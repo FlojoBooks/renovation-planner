@@ -29,15 +29,21 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Kopieer backend runtime (alleen prod deps)
+# Kopieer package.json voor npm ci (prod deps)
 COPY backend/package*.json ./
+
+# Installeer alleen prod deps
 RUN npm ci --omit=dev
-RUN npx prisma generate
 
 # Kopieer gecompileerde backend
 COPY --from=backend-builder /app/backend/dist ./dist
+
+# Kopieer Prisma schema + migraties
 COPY --from=backend-builder /app/backend/prisma ./prisma
+
+# Kopieer gegenereerde Prisma client (geen aparte generate nodig)
 COPY --from=backend-builder /app/backend/node_modules/.prisma ./node_modules/.prisma
+COPY --from=backend-builder /app/backend/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Kopieer frontend build → Express serveert dit als static files
 COPY --from=frontend-builder /app/frontend/dist ./public
