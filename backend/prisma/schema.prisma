@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  startDate   String
+  endDate     String
+  totalBudget Float    @default(0)
+  currency    String   @default("EUR")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subprojects Subproject[]
+  budgetLines BudgetLine[]
+}
+
+model Subproject {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  color       String   @default("blue")
+  startDate   String
+  endDate     String
+  isCollapsed Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  budgetLines BudgetLine[]
+}
+
+model Person {
+  id             String   @id @default(cuid())
+  name           String
+  label          String
+  color          String   @default("#0ea5e9")
+  email          String?
+  avatarInitials String
+  createdAt      DateTime @default(now())
+
+  taskAssignees TaskAssignee[]
+  comments      Comment[]
+}
+
+model Task {
+  id             String   @id @default(cuid())
+  subprojectId   String
+  title          String
+  description    String?
+  status         String   @default("todo")
+  priority       String   @default("medium")
+  startDate      String
+  endDate        String
+  progress       Int      @default(0)
+  isCompleted    Boolean  @default(false)
+  estimatedHours Float?
+  actualHours    Float?
+  order          Int      @default(0)
+  tags           String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  subproject    Subproject     @relation(fields: [subprojectId], references: [id], onDelete: Cascade)
+  assignees     TaskAssignee[]
+  materials     Material[]
+  comments      Comment[]
+
+  // Self-referencing many-to-many for dependencies
+  dependsOn     TaskDependency[] @relation("dependentTask")
+  dependedOnBy  TaskDependency[] @relation("prerequisiteTask")
+}
+
+model TaskAssignee {
+  taskId   String
+  personId String
+
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, personId])
+}
+
+model TaskDependency {
+  dependentTaskId    String
+  prerequisiteTaskId String
+
+  dependentTask    Task @relation("dependentTask",    fields: [dependentTaskId],    references: [id], onDelete: Cascade)
+  prerequisiteTask Task @relation("prerequisiteTask", fields: [prerequisiteTaskId], references: [id], onDelete: Cascade)
+
+  @@id([dependentTaskId, prerequisiteTaskId])
+}
+
+model Material {
+  id            String   @id @default(cuid())
+  taskId        String
+  name          String
+  quantity      Float    @default(1)
+  unit          String   @default("stuks")
+  unitPrice     Float    @default(0)
+  totalPrice    Float    @default(0)
+  status        String   @default("needed")
+  supplier      String?
+  supplierUrl   String?
+  articleNumber String?
+  notes         String?
+  orderedAt     String?
+  deliveredAt   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  taskId     String
+  authorId   String
+  authorName String
+  content    String
+  isEdited   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author Person @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model BudgetLine {
+  id               String   @id @default(cuid())
+  subprojectId     String
+  projectId        String
+  taskId           String?
+  description      String
+  category         String   @default("other")
+  estimated        Float    @default(0)
+  actual           Float    @default(0)
+  isPaid           Boolean  @default(false)
+  paidAt           String?
+  invoiceReference String?
+  supplier         String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subproject Subproject @relation(fields: [subprojectId], references: [id], onDelete: Cascade)
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}

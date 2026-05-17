@@ -1,0 +1,36 @@
+name: PR Quality Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build check
+        run: npm run build
+
+      - name: Report bundle size
+        run: |
+          BUILD_SIZE=$(du -sh dist/ | cut -f1)
+          echo "✅ Bundle size: $BUILD_SIZE"
+          echo "### Bundle size: $BUILD_SIZE" >> $GITHUB_STEP_SUMMARY

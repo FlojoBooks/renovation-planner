@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Slide-in animation for modal */
+  --animate-slide-in: slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+
+  @keyframes slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+  }
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent horizontal scroll on body itself */
+  overflow-x: hidden;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh; /* dynamic viewport height for mobile */
+  width: 100%;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Slide-in modal animation ───────────────────────────── */
+.modal-slide-in {
+  animation: var(--animate-slide-in);
+}
+
+/* ── Mobile: hide sidebar, show bottom nav ──────────────── */
+@media (max-width: 767px) {
+  /* The sidebar becomes a bottom nav strip on mobile */
+  .sidebar-desktop {
+    display: none !important;
+  }
+
+  .bottom-nav {
+    display: flex !important;
+  }
+
+  /* Full-width modal on mobile */
+  .task-modal-panel {
+    max-width: 100% !important;
+    border-radius: 1rem 1rem 0 0;
+    top: auto !important;
+    bottom: 0;
+    height: 92dvh;
+  }
+}
+
+@media (min-width: 768px) {
+  .bottom-nav {
+    display: none !important;
+  }
+
+  .sidebar-desktop {
+    display: flex !important;
+  }
+}
+
+/* ── Gantt container ────────────────────────────────────── */
+.gantt-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Touch-friendly tap targets ────────────────────────── */
+@media (max-width: 767px) {
+  button, a, select, input[type="checkbox"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* But allow small inline badge buttons to be smaller */
+  .badge-btn {
+    min-height: unset;
+    min-width: unset;
+  }
+}
+
+/* ── Prevent text selection during Gantt drag ───────────── */
+.gantt-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Dark mode scrollbars */
+.dark ::-webkit-scrollbar-track { background: #1e293b; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
