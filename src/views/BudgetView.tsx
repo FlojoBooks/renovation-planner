@@ -29,7 +29,7 @@ export function BudgetView() {
   const orderedMaterials = materials.filter((m) => m.status === 'ordered');
 
   return (
-    <div className="h-full overflow-auto p-6 dark:bg-slate-950">
+    <div className="h-full overflow-auto p-6 bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto space-y-6">
 
         {/* KPI Cards */}

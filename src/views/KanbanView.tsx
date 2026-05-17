@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { GripVertical } from 'lucide-react';
 import { useRenovationStore } from '../store/useRenovationStore';
 import type { Task, TaskStatus } from '../types';
 import {
@@ -20,17 +21,32 @@ const COLUMNS: { id: TaskStatus; label: string }[] = [
   { id: 'done',        label: 'Klaar' },
 ];
 
-function TaskCard({ task }: { task: Task }) {
+// ─── TaskCard ────────────────────────────────────────────────────────────────
+
+interface TaskCardProps {
+  task: Task;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
+  onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
+  isDraggingId: string | null;
+}
+
+function TaskCard({ task, onDragStart, onDragEnd, isDraggingId }: TaskCardProps) {
   const { persons, getSubprojectById, openTaskModal, toggleTaskComplete } = useRenovationStore();
   const subproject = getSubprojectById(task.subprojectId);
   const colorCfg = subproject ? SUBPROJECT_COLOR_MAP[subproject.color] : null;
   const overdue = isOverdue(task.endDate, task.status);
+  const isDragging = isDraggingId === task.id;
 
   return (
     <div
+      draggable
+      onDragStart={(e) => onDragStart(e, task.id)}
+      onDragEnd={onDragEnd}
       onClick={() => openTaskModal(task.id)}
-      className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 shadow-sm hover:shadow-md
-        hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer group"
+      className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 shadow-sm
+        hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-grab active:cursor-grabbing group
+        select-none
+        ${isDragging ? 'opacity-50 scale-95 shadow-lg ring-2 ring-primary-400' : ''}`}
     >
       {/* Subproject badge + Priority pill */}
       <div className="flex items-center gap-1.5 flex-wrap mb-2">
@@ -61,6 +77,15 @@ function TaskCard({ task }: { task: Task }) {
           ${task.isCompleted ? 'line-through text-slate-400' : ''}`}>
           {task.title}
         </p>
+        {/* Drag handle — altijd zichtbaar op touch, subtiel op desktop */}
+        <span
+          className="shrink-0 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 touch:opacity-100 transition-opacity mt-0.5"
+          aria-hidden="true"
+          title="Slepen"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4" />
+        </span>
       </div>
 
       {/* Meta row */}
@@ -118,9 +143,116 @@ function TaskCard({ task }: { task: Task }) {
   );
 }
 
+// ─── KanbanColumn ─────────────────────────────────────────────────────────────
+
+interface KanbanColumnProps {
+  id: TaskStatus;
+  label: string;
+  tasks: Task[];
+  isDraggingId: string | null;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
+  onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
+}
+
+function KanbanColumn({ id, label, tasks, isDraggingId, onDragStart, onDragEnd }: KanbanColumnProps) {
+  const { updateTask } = useRenovationStore();
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    // Alleen resetten als we écht de kolom verlaten (niet naar een child)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const taskId = e.dataTransfer.getData('taskId');
+    if (taskId) {
+      updateTask(taskId, { status: id });
+    }
+  };
+
+  return (
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`flex flex-col w-72 rounded-2xl border overflow-hidden transition-all duration-150
+        ${isDragOver
+          ? 'bg-primary-50 dark:bg-primary-950 border-primary-400 dark:border-primary-500 ring-2 ring-primary-400 ring-offset-1'
+          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+        }`}
+    >
+      {/* Column header */}
+      <div className={`px-4 py-3 border-b flex items-center justify-between transition-colors duration-150
+        ${isDragOver
+          ? 'border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950'
+          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+        }`}>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[id]}`}>
+            {label}
+          </span>
+        </div>
+        <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-700 dark:text-slate-300 w-5 h-5 rounded-full flex items-center justify-center">
+          {tasks.length}
+        </span>
+      </div>
+
+      {/* Cards */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+        {tasks.length === 0 && (
+          <div className={`text-center py-8 text-xs transition-colors duration-150
+            ${isDragOver
+              ? 'text-primary-400 dark:text-primary-500'
+              : 'text-slate-400 dark:text-slate-600'
+            }`}>
+            {isDragOver ? '+ Laat los om hier te plaatsen' : 'Geen taken'}
+          </div>
+        )}
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            isDraggingId={isDraggingId}
+          />
+        ))}
+        {/* Drop zone onderaan als kolom al taken heeft */}
+        {tasks.length > 0 && isDragOver && (
+          <div className="h-2 rounded-full bg-primary-300 dark:bg-primary-700 opacity-60 transition-all animate-pulse" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── KanbanView ───────────────────────────────────────────────────────────────
+
 export function KanbanView() {
   const { getFilteredTasks } = useRenovationStore();
   const tasks = getFilteredTasks();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
+    e.dataTransfer.setData('taskId', taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    // Kleine vertraging zodat de opacity-50 pas zichtbaar is nádat de drag-ghost is aangemaakt
+    requestAnimationFrame(() => setDraggingId(taskId));
+  };
+
+  const handleDragEnd = (_e: React.DragEvent<HTMLDivElement>) => {
+    setDraggingId(null);
+  };
 
   return (
     <div className="h-full overflow-x-auto p-6 dark:bg-slate-950">
@@ -128,34 +260,15 @@ export function KanbanView() {
         {COLUMNS.map(({ id, label }) => {
           const colTasks = tasks.filter((t) => t.status === id);
           return (
-            <div
+            <KanbanColumn
               key={id}
-              className="flex flex-col w-72 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-            >
-              {/* Column header */}
-              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[id]}`}>
-                    {label}
-                  </span>
-                </div>
-                <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-700 dark:text-slate-300 w-5 h-5 rounded-full flex items-center justify-center">
-                  {colTasks.length}
-                </span>
-              </div>
-
-              {/* Cards */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-                {colTasks.length === 0 && (
-                  <div className="text-center py-8 text-slate-400 dark:text-slate-600 text-xs">
-                    Geen taken
-                  </div>
-                )}
-                {colTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-              </div>
-            </div>
+              id={id}
+              label={label}
+              tasks={colTasks}
+              isDraggingId={draggingId}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            />
           );
         })}
       </div>

@@ -355,7 +355,7 @@ export function TaskModal() {
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto dark:bg-slate-900">
+        <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900">
 
           {/* ── Details Tab (also shown in create mode) ─── */}
           {(activeTab === 'Details' || createMode) && (

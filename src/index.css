@@ -122,3 +122,9 @@ body {
 .dark ::-webkit-scrollbar-track { background: #1e293b; }
 .dark ::-webkit-scrollbar-thumb { background: #475569; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Dark mode body */
+.dark body {
+  background-color: #020617;
+  color: #e2e8f0;
+}

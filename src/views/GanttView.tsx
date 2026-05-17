@@ -1,9 +1,10 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useRenovationStore } from '../store/useRenovationStore';
 import {
   parseISO, differenceInDays, addDays, format,
   eachWeekOfInterval, eachMonthOfInterval,
   startOfMonth, endOfMonth, eachDayOfInterval,
+  isSunday, isWeekend,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { SUBPROJECT_COLOR_MAP, STATUS_DOT_COLORS } from '../utils';
@@ -13,7 +14,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 // ── Constants ──────────────────────────────────────────────
 const ROW_HEIGHT = 40;
 const SUBPROJECT_ROW_HEIGHT = 36;
-const HEADER_HEIGHT = 56;
+const HEADER_HEIGHT = 60;
 const LABEL_WIDTH = 260;
 const DAY_WIDTH = { Day: 40, Week: 140, Month: 40 } as const;
 type ViewMode = 'Day' | 'Week' | 'Month';
@@ -40,7 +41,7 @@ function dateToX(date: Date, rangeStart: Date, cellWidth: number): number {
   return differenceInDays(date, rangeStart) * cellWidth;
 }
 
-// ── GanttBar with mouse + touch drag ──────────────────────
+// ── GanttBar with mouse + touch drag + progress resize ────
 interface GanttBarProps {
   task: Task;
   rangeStart: Date;
@@ -48,10 +49,14 @@ interface GanttBarProps {
   subprojectColor: string;
   onTaskClick: (id: string) => void;
   onTaskDrag: (id: string, newStartDate: string, newEndDate: string) => void;
+  onProgressChange: (id: string, progress: number) => void;
   darkMode: boolean;
 }
 
-function GanttBar({ task, rangeStart, cellWidth, subprojectColor, onTaskClick, onTaskDrag, darkMode }: GanttBarProps) {
+function GanttBar({
+  task, rangeStart, cellWidth, subprojectColor,
+  onTaskClick, onTaskDrag, onProgressChange, darkMode,
+}: GanttBarProps) {
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const originalStart = useRef(parseISO(task.startDate));
@@ -137,13 +142,18 @@ function GanttBar({ task, rangeStart, cellWidth, subprojectColor, onTaskClick, o
       onTouchStart={handleTouchStart}
       onClick={(e) => { e.stopPropagation(); onTaskClick(task.id); }}
     >
+      {/* Main bar */}
       <rect x={x} y={ROW_HEIGHT / 2 - 11} width={width} height={22} rx={4}
         fill={task.isCompleted ? '#86efac' : subprojectColor + '33'}
         stroke={task.isCompleted ? '#22c55e' : subprojectColor} strokeWidth={1.5} />
+
+      {/* Progress fill */}
       {task.progress > 0 && !task.isCompleted && (
         <rect x={x} y={ROW_HEIGHT / 2 - 11} width={progressWidth} height={22} rx={4}
           fill={subprojectColor + '88'} />
       )}
+
+      {/* Task label */}
       <text x={x + 6} y={ROW_HEIGHT / 2 + 4} fontSize={10}
         fill={textFill} fontWeight="500"
         style={{ pointerEvents: 'none', userSelect: 'none' }}>
@@ -151,28 +161,39 @@ function GanttBar({ task, rangeStart, cellWidth, subprojectColor, onTaskClick, o
           ? task.title.slice(0, Math.floor(width / 7) - 2) + '…'
           : task.title}
       </text>
-    </g>
-  );
-}
 
-// ── Dependency arrows ──────────────────────────────────────
-function DependencyArrow({
-  fromTask, toTask, rowIndexFrom, rowIndexTo, rangeStart, cellWidth, headerOffset, darkMode,
-}: {
-  fromTask: Task; toTask: Task;
-  rowIndexFrom: number; rowIndexTo: number;
-  rangeStart: Date; cellWidth: number; headerOffset: number;
-  darkMode: boolean;
-}) {
-  const x1 = dateToX(parseISO(fromTask.endDate), rangeStart, cellWidth);
-  const y1 = headerOffset + rowIndexFrom + ROW_HEIGHT / 2;
-  const x2 = dateToX(parseISO(toTask.startDate), rangeStart, cellWidth);
-  const y2 = headerOffset + rowIndexTo + ROW_HEIGHT / 2;
-  const path = `M ${x1} ${y1} C ${x1 + 20} ${y1}, ${x2 - 20} ${y2}, ${x2} ${y2}`;
-  const arrowColor = darkMode ? '#475569' : '#94a3b8';
-  return (
-    <path d={path} fill="none" stroke={arrowColor} strokeWidth={1.5}
-      strokeDasharray="4 2" markerEnd="url(#arrowhead)" />
+      {/* Voortgang resize handle — rechterrand */}
+      {!task.isCompleted && (
+        <rect
+          x={x + progressWidth - 4}
+          y={ROW_HEIGHT / 2 - 11}
+          width={8}
+          height={22}
+          rx={2}
+          fill={subprojectColor}
+          opacity={0.8}
+          style={{ cursor: 'ew-resize' }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startX = e.clientX;
+            const startProgress = task.progress;
+            const onMove = (me: MouseEvent) => {
+              const delta = me.clientX - startX;
+              const deltaProgress = Math.round((delta / width) * 100);
+              const newProgress = Math.max(0, Math.min(100, startProgress + deltaProgress));
+              onProgressChange(task.id, newProgress);
+            };
+            const onUp = () => {
+              document.removeEventListener('mousemove', onMove);
+              document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+          }}
+        />
+      )}
+    </g>
   );
 }
 
@@ -189,6 +210,7 @@ export function GanttView() {
     getFilteredTasks,
     openTaskModal,
     updateTaskDates,
+    updateTask,
     toggleSubprojectCollapsed,
     isDarkMode,
   } = useRenovationStore();
@@ -198,6 +220,7 @@ export function GanttView() {
   const cellWidth = DAY_WIDTH[mode];
   const { start: rangeStart, end: rangeEnd } = getDateRange(allTasks, subprojects);
   const darkMode = isDarkMode;
+  const today = new Date();
 
   // ── Synchronized scroll refs ───────────────────────────
   const labelPanelRef = useRef<HTMLDivElement>(null);
@@ -223,13 +246,36 @@ export function GanttView() {
     syncingSvg.current = false;
   }, []);
 
-  // ── Time column headers ────────────────────────────────
-  let columns: { label: string; date: Date; span: number }[] = [];
+  // ── SVG click: open new task modal ────────────────────
+  const handleSvgClick = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      const tag = (e.target as SVGElement).tagName;
+      if (tag === 'svg' || tag === 'rect' || tag === 'line') {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left + (svgPanelRef.current?.scrollLeft ?? 0);
+        const dayOffset = Math.floor(x / cellWidth);
+        const clickedDate = addDays(rangeStart, dayOffset);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _dateStr = format(clickedDate, 'yyyy-MM-dd');
+        // Open modal — datum integratie is toekomstig
+        openTaskModal();
+      }
+    },
+    [cellWidth, rangeStart, openTaskModal]
+  );
+
+  // ── Two-layer column headers ───────────────────────────
+  // Bottom row: individual columns
+  let columns: { label: string; date: Date; span: number; isWeekend?: boolean; isSun?: boolean; isToday?: boolean }[] = [];
+
   if (mode === 'Day') {
     columns = eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map((d) => ({
       label: format(d, 'EEE d', { locale: nl }),
       date: d,
       span: 1,
+      isWeekend: isWeekend(d),
+      isSun: isSunday(d),
+      isToday: format(d, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'),
     }));
   } else if (mode === 'Week') {
     columns = eachWeekOfInterval({ start: rangeStart, end: rangeEnd }, { weekStartsOn: 1 }).map((d) => ({
@@ -239,10 +285,43 @@ export function GanttView() {
     }));
   } else {
     columns = eachMonthOfInterval({ start: rangeStart, end: rangeEnd }).map((d) => ({
-      label: format(d, 'MMMM yyyy', { locale: nl }),
+      label: format(d, 'MMM', { locale: nl }),
       date: d,
       span: differenceInDays(endOfMonth(d), startOfMonth(d)) + 1,
     }));
+  }
+
+  // Top row groups
+  let topGroups: { label: string; x: number; width: number }[] = [];
+  if (mode === 'Day' || mode === 'Week') {
+    topGroups = eachMonthOfInterval({ start: rangeStart, end: rangeEnd }).map((monthStart) => {
+      const monthEnd = endOfMonth(monthStart);
+      const clampedStart = monthStart < rangeStart ? rangeStart : monthStart;
+      const clampedEnd = monthEnd > rangeEnd ? rangeEnd : monthEnd;
+      return {
+        label: format(monthStart, 'MMMM yyyy', { locale: nl }),
+        x: dateToX(clampedStart, rangeStart, cellWidth),
+        width: (differenceInDays(clampedEnd, clampedStart) + 1) * cellWidth,
+      };
+    });
+  } else {
+    // Month mode: group by year
+    const years = [
+      ...new Set(
+        eachMonthOfInterval({ start: rangeStart, end: rangeEnd }).map((d) => d.getFullYear())
+      ),
+    ];
+    topGroups = years.map((year) => {
+      const yearStart = new Date(year, 0, 1);
+      const yearEnd = new Date(year, 11, 31);
+      const clampedStart = yearStart < rangeStart ? rangeStart : yearStart;
+      const clampedEnd = yearEnd > rangeEnd ? rangeEnd : yearEnd;
+      return {
+        label: String(year),
+        x: dateToX(clampedStart, rangeStart, cellWidth),
+        width: (differenceInDays(clampedEnd, clampedStart) + 1) * cellWidth,
+      };
+    });
   }
 
   const totalWidth = differenceInDays(rangeEnd, rangeStart) * cellWidth;
@@ -302,8 +381,10 @@ export function GanttView() {
           style={{ width: LABEL_WIDTH }}
         >
           {/* Header spacer */}
-          <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 flex items-center shrink-0"
-            style={{ height: HEADER_HEIGHT }}>
+          <div
+            className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 flex items-center shrink-0"
+            style={{ height: HEADER_HEIGHT }}
+          >
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Taak</span>
           </div>
 
@@ -361,6 +442,8 @@ export function GanttView() {
             width={Math.max(totalWidth + 40, 800)}
             height={svgHeight}
             className="block"
+            style={{ cursor: 'crosshair' }}
+            onClick={handleSvgClick}
           >
             <defs>
               <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
@@ -368,22 +451,84 @@ export function GanttView() {
               </marker>
             </defs>
 
-            {/* Header background */}
+            {/* ── Header background ── */}
             <rect x={0} y={0} width={totalWidth + 40} height={HEADER_HEIGHT} fill={headerBg} />
-            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth + 40} y2={HEADER_HEIGHT} stroke={headerLineFill} strokeWidth={1} />
 
-            {/* Column headers + vertical lines */}
+            {/* ── Top-layer header: month/year groups ── */}
+            {topGroups.map((grp, i) => (
+              <g key={`tg-${i}`}>
+                {/* Group background */}
+                <rect x={grp.x} y={0} width={grp.width} height={28}
+                  fill={i % 2 === 0
+                    ? (darkMode ? '#0f172a' : '#f1f5f9')
+                    : (darkMode ? '#1e293b' : '#e2e8f0')}
+                />
+                {/* Group label */}
+                <text x={grp.x + 8} y={20} fontSize={11} fill={darkMode ? '#cbd5e1' : '#475569'}
+                  fontWeight="600" style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                  {grp.label}
+                </text>
+                {/* Left border of group */}
+                <line x1={grp.x} y1={0} x2={grp.x} y2={28}
+                  stroke={headerLineFill} strokeWidth={1} />
+              </g>
+            ))}
+
+            {/* Separator between top and bottom header rows */}
+            <line x1={0} y1={28} x2={totalWidth + 40} y2={28} stroke={headerLineFill} strokeWidth={1} />
+
+            {/* ── Bottom-layer header: columns ── */}
             {columns.map((col, i) => {
               const x = dateToX(col.date, rangeStart, cellWidth);
+              const labelColor = col.isSun
+                ? '#ef4444'
+                : col.isToday
+                  ? '#3b82f6'
+                  : headerTextFill;
               return (
-                <g key={i}>
-                  <text x={x + 8} y={30} fontSize={11} fill={headerTextFill} fontWeight="500">{col.label}</text>
-                  <line x1={x} y1={0} x2={x} y2={svgHeight} stroke={headerLineFill} strokeWidth={1} />
+                <g key={`col-${i}`}>
+                  {/* Weekend column tint spanning full chart */}
+                  {mode === 'Day' && col.isWeekend && (
+                    <rect
+                      x={x}
+                      y={HEADER_HEIGHT}
+                      width={cellWidth}
+                      height={totalRowsHeight + 20}
+                      fill={darkMode ? 'rgba(148,163,184,0.06)' : 'rgba(148,163,184,0.08)'}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                  {/* Today highlight in bottom header */}
+                  {col.isToday && (
+                    <rect x={x} y={28} width={cellWidth} height={HEADER_HEIGHT - 28}
+                      fill={darkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)'}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                  {/* Bottom column label */}
+                  <text
+                    x={x + (mode === 'Day' ? cellWidth / 2 : 8)}
+                    y={48}
+                    fontSize={mode === 'Day' ? 10 : 11}
+                    fill={labelColor}
+                    fontWeight={col.isToday ? '700' : '500'}
+                    textAnchor={mode === 'Day' ? 'middle' : 'start'}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    {col.label}
+                  </text>
+                  {/* Vertical column separator */}
+                  <line x1={x} y1={28} x2={x} y2={svgHeight}
+                    stroke={headerLineFill} strokeWidth={1} />
                 </g>
               );
             })}
 
-            {/* Row background stripes (aligned with row structure) */}
+            {/* Bottom header border */}
+            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth + 40} y2={HEADER_HEIGHT}
+              stroke={headerLineFill} strokeWidth={1} />
+
+            {/* ── Row background stripes ── */}
             {rows.map((row, i) => (
               <rect
                 key={`bg-${i}`}
@@ -392,22 +537,24 @@ export function GanttView() {
                 width={totalWidth + 40}
                 height={row.height}
                 fill={rowFill(row, i)}
+                style={{ pointerEvents: 'none' }}
               />
             ))}
 
-            {/* Today line */}
+            {/* ── Today line ── */}
             {todayX >= 0 && (
               <>
                 <line x1={todayX} y1={0} x2={todayX} y2={svgHeight}
                   stroke="#0ea5e9" strokeWidth={2} strokeDasharray="6 3" opacity={0.6} />
                 <rect x={todayX - 24} y={4} width={48} height={18} rx={9} fill="#0ea5e9" />
-                <text x={todayX} y={16} fontSize={9} fill="white" textAnchor="middle" fontWeight="700">
+                <text x={todayX} y={16} fontSize={9} fill="white" textAnchor="middle" fontWeight="700"
+                  style={{ pointerEvents: 'none' }}>
                   VANDAAG
                 </text>
               </>
             )}
 
-            {/* Dependency arrows */}
+            {/* ── Dependency arrows ── */}
             {rows.map((row) => {
               if (row.type !== 'task') return null;
               return row.task.dependencies.map((depId) => {
@@ -426,12 +573,14 @@ export function GanttView() {
               });
             })}
 
-            {/* Task bars */}
+            {/* ── Task bars ── */}
             {rows.map((row, i) => {
               if (row.type !== 'task') return null;
               return (
                 <g key={`bar-${row.task.id}`}
-                  transform={`translate(0, ${HEADER_HEIGHT + rowYOffsets[i]})`}>
+                  transform={`translate(0, ${HEADER_HEIGHT + rowYOffsets[i]})`}
+                  style={{ cursor: 'grab' }}
+                >
                   <GanttBar
                     task={row.task}
                     rangeStart={rangeStart}
@@ -439,6 +588,7 @@ export function GanttView() {
                     subprojectColor={SUBPROJECT_COLOR_MAP[row.subproject.color].gantt}
                     onTaskClick={openTaskModal}
                     onTaskDrag={updateTaskDates}
+                    onProgressChange={(id, progress) => updateTask(id, { progress })}
                     darkMode={darkMode}
                   />
                 </g>
