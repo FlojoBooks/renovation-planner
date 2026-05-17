@@ -15,7 +15,7 @@ FROM node:20-alpine AS backend-builder
 
 WORKDIR /app/backend
 
-COPY backend/package.json backend/package-lock.json ./
+COPY backend/package*.json ./
 COPY backend/prisma ./prisma
 RUN npm ci
 RUN npx prisma generate
@@ -30,7 +30,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Kopieer backend runtime (alleen prod deps)
-COPY backend/package.json backend/package-lock.json ./
+COPY backend/package*.json ./
 RUN npm ci --omit=dev
 RUN npx prisma generate
 
