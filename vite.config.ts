@@ -39,7 +39,7 @@ export default defineConfig({
   // ── Production build ─────────────────────────────────────────────────────
   build: {
     target: 'es2020',
-    minify: 'esbuild',
+    minify: 'oxc',
     sourcemap: false,           // kleinere bundles in productie
     cssCodeSplit: true,         // per-chunk CSS in plaats van één groot bestand
     chunkSizeWarningLimit: 600,
