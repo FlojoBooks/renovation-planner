@@ -22,15 +22,17 @@ const httpServer = createServer(app);
 // CORS is alleen nodig in development (frontend op andere poort).
 const isProd = process.env.NODE_ENV === 'production';
 
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+};
+
 const io = new Server(httpServer, {
-  cors: isProd ? false : {
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  },
+  cors: isProd ? {} : corsOptions,
 });
 
 if (!isProd) {
-  app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000' }));
+  app.use(cors({ origin: corsOptions.origin }));
 }
 
 app.use(express.json());
