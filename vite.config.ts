@@ -47,10 +47,12 @@ export default defineConfig({
       output: {
         // Vendor splitting — houdt app-code gescheiden van libs
         // Browser cachet vendors apart → bij app-updates alleen app-chunk opnieuw laden
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-ui':    ['lucide-react'],
-          'vendor-utils': ['date-fns', 'zustand'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) return 'vendor-react';
+            if (id.includes('lucide-react')) return 'vendor-ui';
+            if (id.includes('date-fns') || id.includes('zustand')) return 'vendor-utils';
+          }
         },
       },
     },
