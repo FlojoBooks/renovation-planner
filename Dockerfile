@@ -1,45 +1,58 @@
-# ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# ── Stage 1: Frontend build ───────────────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+# Output: /app/frontend/dist
+
+# ── Stage 2: Backend build ────────────────────────────────────────────────────
+FROM node:20-alpine AS backend-builder
+
+WORKDIR /app/backend
+
+COPY backend/package.json backend/package-lock.json ./
+COPY backend/prisma ./prisma
+RUN npm ci
+RUN npx prisma generate
+
+COPY backend/ .
+RUN npm run build
+# Output: /app/backend/dist
+
+# ── Stage 3: Production ───────────────────────────────────────────────────────
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Kopieer package-bestanden eerst → optimale laagcaching
-COPY package.json package-lock.json ./
+# Kopieer backend runtime (alleen prod deps)
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci --omit=dev
+RUN npx prisma generate
 
-# Installeer alle dependencies (devDeps nodig voor Vite/tsc build)
-RUN npm ci
+# Kopieer gecompileerde backend
+COPY --from=backend-builder /app/backend/dist ./dist
+COPY --from=backend-builder /app/backend/prisma ./prisma
+COPY --from=backend-builder /app/backend/node_modules/.prisma ./node_modules/.prisma
 
-# Kopieer broncode en bouw de app
-COPY . .
-RUN npm run build
+# Kopieer frontend build → Express serveert dit als static files
+COPY --from=frontend-builder /app/frontend/dist ./public
 
-# ── Stage 2: Production – nginx (gepinde versie voor reproducibility) ─────────
-FROM nginx:1.27-alpine AS production
-
-# Verwijder de default nginx config
-RUN rm -f /etc/nginx/conf.d/default.conf
-
-# Kopieer onze volledige nginx-configuratie
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Kopieer de gebouwde static assets
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Maak non-root gebruiker aan en pas eigenaarschap aan
+# Non-root gebruiker
 RUN addgroup -g 1001 -S appgroup \
     && adduser -u 1001 -S appuser -G appgroup \
-    && chown -R appuser:appgroup /usr/share/nginx/html \
-    && chown -R appuser:appgroup /var/cache/nginx \
-    && chown -R appuser:appgroup /var/log/nginx \
-    && touch /var/run/nginx.pid \
-    && chown appuser:appgroup /var/run/nginx.pid
+    && chown -R appuser:appgroup /app
 
 USER appuser
 
-EXPOSE 8080
+EXPOSE 3001
 
-# Health check – Railway en Docker kunnen hiermee de container monitoren
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# Voer migraties uit en start de server
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
