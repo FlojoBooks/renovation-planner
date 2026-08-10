@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { useRenovationStore } from './store/useRenovationStore';
 import { useSocket } from './hooks/useSocket';
 import { Sidebar } from './components/Sidebar';
@@ -39,6 +39,15 @@ const MOBILE_NAV: { id: ActiveView; label: string; icon: React.ElementType }[] =
 function App() {
   const { activeView, setActiveView, isDarkMode, currentUser } = useRenovationStore();
   useSocket();
+
+  // Synchroniseer donker thema class met document element (<html>)
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   // Als de gebruiker niet is ingelogd, toon het inlog- / registratiescherm
   if (!currentUser) {

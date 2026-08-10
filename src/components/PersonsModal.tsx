@@ -122,38 +122,38 @@ export function PersonsModal() {
 
               if (isEditing) {
                 return (
-                  <div key={person.id} className="border-2 border-primary-300 dark:border-primary-700 rounded-xl p-4 space-y-3 bg-primary-50 dark:bg-slate-800">
+                  <div key={person.id} className="border-2 border-primary-300 dark:border-primary-700 rounded-xl p-4 space-y-3 bg-primary-50/50 dark:bg-slate-800/80">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Naam</label>
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Naam</label>
                         <input type="text" value={editForm.name}
                           onChange={(e) => handleNameChange(e.target.value, setEditForm, editForm)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white" />
+                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Label</label>
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Label</label>
                         <input type="text" value={editForm.label}
                           onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
                           placeholder={editForm.name}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white" />
+                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Initialen</label>
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Initialen</label>
                         <input type="text" value={editForm.avatarInitials} maxLength={2}
                           onChange={(e) => setEditForm({ ...editForm, avatarInitials: e.target.value.toUpperCase() })}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white" />
+                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">E-mail</label>
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">E-mail</label>
                         <input type="email" value={editForm.email} placeholder="optioneel"
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white" />
+                          className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 block">Kleur</label>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block">Kleur</label>
                       <div className="flex gap-2 flex-wrap">
                         {PRESET_COLORS.map((c) => (
                           <button key={c} onClick={() => setEditForm({ ...editForm, color: c })}
@@ -204,38 +204,38 @@ export function PersonsModal() {
 
             {/* Add Person Form */}
             {showAdd && (
-              <div className="border-2 border-dashed border-primary-300 dark:border-primary-700 rounded-xl p-4 space-y-3 bg-primary-50/50 dark:bg-slate-800">
+              <div className="border-2 border-dashed border-primary-300 dark:border-primary-700 rounded-xl p-4 space-y-3 bg-primary-50/50 dark:bg-slate-800/80">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Nieuwe persoon</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Naam *</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Naam *</label>
                     <input type="text" value={form.name} autoFocus
                       onChange={(e) => handleNameChange(e.target.value, setForm, form)}
                       placeholder="bijv. Elektricien"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Label</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Label</label>
                     <input type="text" value={form.label}
                       onChange={(e) => setForm({ ...form, label: e.target.value })}
                       placeholder={form.name || 'Korte naam'}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Initialen</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">Initialen</label>
                     <input type="text" value={form.avatarInitials} maxLength={2}
                       onChange={(e) => setForm({ ...form, avatarInitials: e.target.value.toUpperCase() })}
                       placeholder="bijv. EL"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">E-mail</label>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">E-mail</label>
                     <input type="email" value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       placeholder="optioneel"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+                      className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                   </div>
                 </div>
                 <div>

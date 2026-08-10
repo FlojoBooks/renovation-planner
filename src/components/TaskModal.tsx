@@ -422,12 +422,12 @@ export function TaskModal() {
               {/* Status + Priority */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Status</label>
                   <select
                     value={editStatus}
                     onChange={(e) => handleStatusChange(e.target.value as TaskStatus)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-xl
-                      focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 dark:text-slate-200"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                      focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                   >
                     {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
                       <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -435,12 +435,12 @@ export function TaskModal() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Prioriteit</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Prioriteit</label>
                   <select
                     value={editPriority}
                     onChange={(e) => handlePriorityChange(e.target.value as TaskPriority)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-xl
-                      focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 dark:text-slate-200"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                      focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                   >
                     {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((p) => (
                       <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
@@ -452,23 +452,23 @@ export function TaskModal() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Startdatum</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Startdatum</label>
                   <input
                     type="date"
                     value={editStartDate}
                     onChange={(e) => handleStartDateChange(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-xl
-                      focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-800 dark:text-slate-200"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                      focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Einddatum</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Einddatum</label>
                   <input
                     type="date"
                     value={editEndDate}
                     onChange={(e) => handleEndDateChange(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-xl
-                      focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-800 dark:text-slate-200"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                      focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                   />
                 </div>
               </div>
@@ -476,7 +476,7 @@ export function TaskModal() {
               {/* Progress (edit mode only) */}
               {!createMode && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                     Voortgang — {editProgress}%
                   </label>
                   <input
@@ -493,26 +493,26 @@ export function TaskModal() {
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Omschrijving</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Omschrijving</label>
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   onBlur={() => !createMode && saveField()}
                   rows={3}
                   placeholder="Omschrijving van de taak..."
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-xl
-                    focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                    focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
               </div>
 
               {/* Fase */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Fase</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Fase</label>
                 <select
                   value={editSubprojectId}
                   onChange={(e) => handleSubprojectChange(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-600 rounded-xl
-                    focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 dark:text-slate-200"
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-xl
+                    focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                 >
                   {subprojects.map((sp) => (
                     <option key={sp.id} value={sp.id}>{sp.name}</option>

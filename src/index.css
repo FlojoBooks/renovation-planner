@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary-50: #f0f9ff;
   --color-primary-100: #e0f2fe;
@@ -23,7 +25,7 @@
   }
 }
 
-/* ── Reset ──────────────────────────────────────────────── */
+/* ── Reset & Global Typography ──────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
@@ -35,11 +37,19 @@ html, body, #root {
 body {
   font-family: var(--font-sans);
   background-color: #f8fafc;
-  color: #1e293b;
+  color: #0f172a;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Prevent horizontal scroll on body itself */
   overflow-x: hidden;
+}
+
+/* Prevent white-on-white text in inputs */
+input, select, textarea {
+  color: #0f172a;
+}
+
+.dark input, .dark select, .dark textarea {
+  color: #f8fafc;
 }
 
 #root {
