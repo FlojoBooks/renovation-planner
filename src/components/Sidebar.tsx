@@ -15,6 +15,8 @@ import {
   Sun,
   Users,
   Layers,
+  Receipt,
+  UserPlus,
 } from 'lucide-react';
 import type { ActiveView } from '../types';
 import { SUBPROJECT_COLOR_MAP } from '../utils';
@@ -27,11 +29,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'gantt',    label: 'Gantt',     icon: GanttChart },
-  { id: 'kanban',   label: 'Kanban',    icon: LayoutGrid },
-  { id: 'list',     label: 'Lijst',     icon: List },
-  { id: 'budget',   label: 'Budget',    icon: Wallet },
-  { id: 'upgrades', label: 'Upgrades',  icon: Sparkles },
+  { id: 'gantt',    label: 'Gantt',              icon: GanttChart },
+  { id: 'kanban',   label: 'Kanban',             icon: LayoutGrid },
+  { id: 'list',     label: 'Lijst',              icon: List },
+  { id: 'budget',   label: 'Budget',             icon: Wallet },
+  { id: 'expenses', label: 'Betalingen & Bonnen', icon: Receipt },
+  { id: 'upgrades', label: 'Upgrades',           icon: Sparkles },
 ];
 
 export function Sidebar() {
@@ -51,6 +54,7 @@ export function Sidebar() {
     project,
     currentUser,
     openAuthModal,
+    openInviteModal,
   } = useRenovationStore();
 
   const collapsed = isSidebarCollapsed;

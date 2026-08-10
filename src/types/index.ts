@@ -21,7 +21,7 @@ export type SubprojectColor =
 
 export type GanttViewMode = 'Day' | 'Week' | 'Month';
 
-export type ActiveView = 'gantt' | 'kanban' | 'list' | 'budget' | 'upgrades';
+export type ActiveView = 'gantt' | 'kanban' | 'list' | 'budget' | 'expenses' | 'upgrades';
 
 // ============================================================
 // USERS & ROLES
@@ -38,7 +38,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password?: string;
+  passwordHash?: string;
+  passwordSalt?: string;
   role: UserRole;
   roleTitle?: string;
   company?: string;
@@ -285,6 +286,63 @@ export interface SubprojectBudget {
 }
 
 // ============================================================
+// EXPENSES, PAYMENTS & SETTLEMENT ("Wie Betaalt Wat")
+// ============================================================
+
+export type PaymentCategory =
+  | 'materials'
+  | 'tools'
+  | 'labor'
+  | 'fuel'
+  | 'catering'
+  | 'equipment'
+  | 'administrative'
+  | 'other';
+
+export interface PaymentExpense {
+  id: string;
+  title: string;
+  amount: number;
+  paidByUserId: string;
+  paidByUserName: string;
+  date: string; // YYYY-MM-DD
+  category: PaymentCategory;
+  receiptImage?: string; // compressed base64
+  receiptThumbnail?: string;
+  receiptFileName?: string;
+  splitAmongUserIds: string[]; // User IDs that share this expense
+  subprojectId?: string;
+  taskId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserSettlement {
+  userId: string;
+  userName: string;
+  avatarColor: string;
+  avatarInitials: string;
+  totalPaid: number;
+  fairShare: number;
+  netBalance: number; // Positive = receives back, Negative = owes
+}
+
+export interface SettlementTransfer {
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  toUserName: string;
+  amount: number;
+}
+
+export interface SettlementSummary {
+  totalSpent: number;
+  userSettlements: UserSettlement[];
+  transfers: SettlementTransfer[];
+}
+
+// ============================================================
 // PROJECT (ROOT ENTITY)
 // ============================================================
 
@@ -319,6 +377,7 @@ export interface RenovationStore {
   currentUser: User | null;
   availableUpgrades: UpgradeOption[];
   projectUpgrades: ProjectUpgrade[];
+  expenses: PaymentExpense[];
 
   // ── UI State ──────────────────────────────────────────────
   activeView: ActiveView;
@@ -328,6 +387,10 @@ export interface RenovationStore {
   isTaskModalOpen: boolean;
   isPersonsModalOpen: boolean;
   isAuthModalOpen: boolean;
+  isExpenseModalOpen: boolean;
+  isInviteModalOpen: boolean;
+  selectedReceiptImage: string | null;
+  editingExpenseId: string | null;
   isSidebarCollapsed: boolean;
   isDarkMode: boolean;
   searchQuery: string;
@@ -339,11 +402,26 @@ export interface RenovationStore {
   // ── Auth Actions ──────────────────────────────────────────
   setCurrentUser: (user: User | null) => void;
   loginUser: (email: string, password?: string) => { success: boolean; error?: string };
+  loginUserAsync: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   registerUser: (user: Omit<User, 'id' | 'createdAt'>) => User;
+  registerUserAsync: (userData: Omit<User, 'id' | 'createdAt' | 'passwordHash' | 'passwordSalt'> & { password?: string }) => Promise<User>;
   switchUser: (userId: string) => void;
   logoutUser: () => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  openInviteModal: () => void;
+  closeInviteModal: () => void;
+  generateInviteLink: (role?: UserRole, expiresInDays?: number) => string;
+
+  // ── Expense Actions ───────────────────────────────────────
+  openExpenseModal: (expenseId?: string) => void;
+  closeExpenseModal: () => void;
+  openReceiptLightbox: (imageUrl: string) => void;
+  closeReceiptLightbox: () => void;
+  addExpense: (expense: Omit<PaymentExpense, 'id' | 'createdAt' | 'updatedAt'>) => PaymentExpense;
+  updateExpense: (id: string, updates: Partial<PaymentExpense>) => void;
+  deleteExpense: (id: string) => void;
+  getSettlementSummary: () => SettlementSummary;
 
   // ── Upgrade Actions ───────────────────────────────────────
   addUpgradeToProject: (upgradeOptionId: string, customPrice?: number) => void;

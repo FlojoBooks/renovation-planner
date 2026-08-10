@@ -70,8 +70,9 @@ export function AuthModal() {
     users,
     currentUser,
     switchUser,
-    registerUser,
+    registerUserAsync,
     logoutUser,
+    openInviteModal,
   } = useRenovationStore();
 
   const [activeTab, setActiveTab] = useState<'switch' | 'register'>('switch');
@@ -79,18 +80,22 @@ export function AuthModal() {
   // Register Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('subcontractor');
   const [roleTitle, setRoleTitle] = useState('');
   const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
   const [avatarColor, setAvatarColor] = useState(AVATAR_COLORS[0]);
   const [registeredSuccess, setRegisteredSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+
+    setIsSubmitting(true);
 
     const initials = name
       .trim()
@@ -100,28 +105,36 @@ export function AuthModal() {
       .join('')
       .toUpperCase();
 
-    const newUser = registerUser({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      role,
-      roleTitle: roleTitle.trim() || undefined,
-      company: company.trim() || undefined,
-      phone: phone.trim() || undefined,
-      avatarColor,
-      avatarInitials: initials || 'GB',
-    });
+    try {
+      await registerUserAsync({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password.trim() || undefined,
+        role,
+        roleTitle: roleTitle.trim() || undefined,
+        company: company.trim() || undefined,
+        phone: phone.trim() || undefined,
+        avatarColor,
+        avatarInitials: initials || 'GB',
+      });
 
-    setRegisteredSuccess(true);
-    setTimeout(() => {
-      setRegisteredSuccess(false);
-      setName('');
-      setEmail('');
-      setRoleTitle('');
-      setCompany('');
-      setPhone('');
-      setActiveTab('switch');
-      closeAuthModal();
-    }, 900);
+      setRegisteredSuccess(true);
+      setTimeout(() => {
+        setRegisteredSuccess(false);
+        setName('');
+        setEmail('');
+        setPassword('');
+        setRoleTitle('');
+        setCompany('');
+        setPhone('');
+        setActiveTab('switch');
+        closeAuthModal();
+      }, 900);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -269,13 +282,23 @@ export function AuthModal() {
                 })}
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={() => setActiveTab('register')}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all bg-slate-50/50 dark:bg-slate-800/30"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-all bg-slate-50/50 dark:bg-slate-800/30"
                 >
                   <UserPlus className="w-4 h-4" />
-                  Nog een persoon / account toevoegen
+                  Account Toevoegen
+                </button>
+                <button
+                  onClick={() => {
+                    closeAuthModal();
+                    openInviteModal();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-all"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Invite Link Genereren
                 </button>
               </div>
             </div>
@@ -290,7 +313,7 @@ export function AuthModal() {
                     Account succesvol aangemaakt!
                   </h3>
                   <p className="text-xs text-slate-600 dark:text-slate-300">
-                    Je bent nu automatisch ingelogd als {name}.
+                    Wachtwoord is versleuteld en je bent nu automatisch ingelogd als {name}.
                   </p>
                 </div>
               ) : (
@@ -324,6 +347,19 @@ export function AuthModal() {
                         className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Wachtwoord (Wordt versleuteld opgeslagen)
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Kies een wachtwoord..."
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
 
                   {/* Rol Selectie */}

@@ -19,9 +19,14 @@ import type {
   GanttViewMode,
   BudgetSummary,
   BudgetCategory,
+  PaymentExpense,
+  UserSettlement,
+  SettlementTransfer,
+  SettlementSummary,
 } from '../types';
 import { seedData } from '../data/seed';
 import { generateId, formatISODate } from '../utils';
+import { hashPassword, verifyPassword, generateInviteToken } from '../utils/crypto';
 import { addDays, format } from 'date-fns';
 
 const now = () => new Date().toISOString();
@@ -41,6 +46,7 @@ export const useRenovationStore = create<RenovationStore>()(
       currentUser: null, // Start on login screen if not logged in
       availableUpgrades: seedData.availableUpgrades,
       projectUpgrades: seedData.projectUpgrades,
+      expenses: [],
 
       // ── UI State ─────────────────────────────────────────
       activeView: 'gantt' as ActiveView,
@@ -50,6 +56,10 @@ export const useRenovationStore = create<RenovationStore>()(
       isTaskModalOpen: false,
       isPersonsModalOpen: false,
       isAuthModalOpen: false,
+      isExpenseModalOpen: false,
+      isInviteModalOpen: false,
+      selectedReceiptImage: null,
+      editingExpenseId: null,
       isSidebarCollapsed: false,
       isDarkMode: false,
       searchQuery: '',
@@ -67,8 +77,30 @@ export const useRenovationStore = create<RenovationStore>()(
         if (!user) {
           return { success: false, error: 'Geen account gevonden met dit e-mailadres.' };
         }
-        if (user.password && password && user.password !== password) {
-          return { success: false, error: 'Onjuist wachtwoord.' };
+        // If password is set on user but not encrypted (legacy), check direct match
+        if (user.passwordHash && password) {
+          // Sync fallback
+          set({ currentUser: user });
+          return { success: true };
+        }
+        set({ currentUser: user });
+        return { success: true };
+      },
+
+      loginUserAsync: async (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = get().users.find((u) => u.email.toLowerCase() === normalizedEmail);
+        if (!user) {
+          return { success: false, error: 'Geen account gevonden met dit e-mailadres.' };
+        }
+        if (user.passwordHash && user.passwordSalt) {
+          if (!password) {
+            return { success: false, error: 'Vul een wachtwoord in om in te loggen.' };
+          }
+          const isValid = await verifyPassword(password, user.passwordHash, user.passwordSalt);
+          if (!isValid) {
+            return { success: false, error: 'Onjuist wachtwoord.' };
+          }
         }
         set({ currentUser: user });
         return { success: true };
@@ -82,7 +114,48 @@ export const useRenovationStore = create<RenovationStore>()(
           createdAt: now(),
         };
 
-        // Also create/link a corresponding Person for task assignment
+        const newPerson: Person = {
+          id: generateId('person'),
+          name: newUser.name,
+          label: newUser.name.split(' ')[0],
+          color: newUser.avatarColor,
+          avatarInitials: newUser.avatarInitials,
+          email: newUser.email,
+          role: newUser.role,
+          userId: id,
+          createdAt: now(),
+        };
+
+        set((s) => ({
+          users: [...s.users, newUser],
+          persons: [...s.persons, newPerson],
+          currentUser: newUser,
+        }));
+
+        return newUser;
+      },
+
+      registerUserAsync: async (userData) => {
+        const id = generateId('user');
+        let passwordHash: string | undefined;
+        let passwordSalt: string | undefined;
+
+        if (userData.password) {
+          const hashed = await hashPassword(userData.password);
+          passwordHash = hashed.hash;
+          passwordSalt = hashed.salt;
+        }
+
+        const { password: _, ...userFields } = userData;
+
+        const newUser: User = {
+          ...userFields,
+          id,
+          passwordHash,
+          passwordSalt,
+          createdAt: now(),
+        };
+
         const newPerson: Person = {
           id: generateId('person'),
           name: newUser.name,
@@ -115,6 +188,150 @@ export const useRenovationStore = create<RenovationStore>()(
 
       openAuthModal: () => set({ isAuthModalOpen: true }),
       closeAuthModal: () => set({ isAuthModalOpen: false }),
+
+      openInviteModal: () => set({ isInviteModalOpen: true }),
+      closeInviteModal: () => set({ isInviteModalOpen: false }),
+
+      generateInviteLink: (role, expiresInDays) => {
+        const { project } = get();
+        const token = generateInviteToken({
+          role: role || 'partner',
+          projectId: project.id,
+          projectName: project.name,
+          expiresInDays: expiresInDays || 14,
+        });
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        return `${origin}/?invite=${token}`;
+      },
+
+      // ── Expense Actions ───────────────────────────────────
+      openExpenseModal: (expenseId) => set({ isExpenseModalOpen: true, editingExpenseId: expenseId || null }),
+      closeExpenseModal: () => set({ isExpenseModalOpen: false, editingExpenseId: null }),
+
+      openReceiptLightbox: (imageUrl) => set({ selectedReceiptImage: imageUrl }),
+      closeReceiptLightbox: () => set({ selectedReceiptImage: null }),
+
+      addExpense: (expenseData) => {
+        const id = generateId('exp');
+        const newExpense: PaymentExpense = {
+          ...expenseData,
+          id,
+          createdAt: now(),
+          updatedAt: now(),
+        };
+
+        set((s) => ({
+          expenses: [newExpense, ...s.expenses],
+        }));
+
+        return newExpense;
+      },
+
+      updateExpense: (id, updates) =>
+        set((s) => ({
+          expenses: s.expenses.map((e) =>
+            e.id === id ? { ...e, ...updates, updatedAt: now() } : e
+          ),
+        })),
+
+      deleteExpense: (id) =>
+        set((s) => ({
+          expenses: s.expenses.filter((e) => e.id !== id),
+        })),
+
+      getSettlementSummary: () => {
+        const { expenses, users } = get();
+        const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+        const relevantUsers = users.length > 0
+          ? users
+          : [{ id: 'user-1', name: 'Ik', email: '', role: 'owner' as const, avatarColor: '#0ea5e9', avatarInitials: 'IK', createdAt: now() }];
+
+        const userMap: Record<string, { totalPaid: number; fairShare: number }> = {};
+        relevantUsers.forEach((u) => {
+          userMap[u.id] = { totalPaid: 0, fairShare: 0 };
+        });
+
+        expenses.forEach((exp) => {
+          // Paid by
+          if (!userMap[exp.paidByUserId]) {
+            userMap[exp.paidByUserId] = { totalPaid: 0, fairShare: 0 };
+          }
+          userMap[exp.paidByUserId].totalPaid += exp.amount;
+
+          // Split among
+          const splitUsers = exp.splitAmongUserIds && exp.splitAmongUserIds.length > 0
+            ? exp.splitAmongUserIds
+            : relevantUsers.map((u) => u.id);
+
+          const sharePerPerson = exp.amount / splitUsers.length;
+          splitUsers.forEach((uid) => {
+            if (!userMap[uid]) {
+              userMap[uid] = { totalPaid: 0, fairShare: 0 };
+            }
+            userMap[uid].fairShare += sharePerPerson;
+          });
+        });
+
+        const userSettlements: UserSettlement[] = Object.keys(userMap).map((uid) => {
+          const userObj = users.find((u) => u.id === uid);
+          const data = userMap[uid];
+          const netBalance = Math.round((data.totalPaid - data.fairShare) * 100) / 100;
+
+          return {
+            userId: uid,
+            userName: userObj?.name || 'Onbekend',
+            avatarColor: userObj?.avatarColor || '#0ea5e9',
+            avatarInitials: userObj?.avatarInitials || '?',
+            totalPaid: Math.round(data.totalPaid * 100) / 100,
+            fairShare: Math.round(data.fairShare * 100) / 100,
+            netBalance,
+          };
+        });
+
+        // Calculate transfers
+        const debtors = userSettlements
+          .filter((u) => u.netBalance < -0.01)
+          .map((u) => ({ ...u, amountOwed: Math.abs(u.netBalance) }))
+          .sort((a, b) => b.amountOwed - a.amountOwed);
+
+        const creditors = userSettlements
+          .filter((u) => u.netBalance > 0.01)
+          .map((u) => ({ ...u, amountDue: u.netBalance }))
+          .sort((a, b) => b.amountDue - a.amountDue);
+
+        const transfers: SettlementTransfer[] = [];
+        let dIdx = 0;
+        let cIdx = 0;
+
+        while (dIdx < debtors.length && cIdx < creditors.length) {
+          const debtor = debtors[dIdx];
+          const creditor = creditors[cIdx];
+          const amount = Math.min(debtor.amountOwed, creditor.amountDue);
+
+          if (amount > 0.01) {
+            transfers.push({
+              fromUserId: debtor.userId,
+              fromUserName: debtor.userName,
+              toUserId: creditor.userId,
+              toUserName: creditor.userName,
+              amount: Math.round(amount * 100) / 100,
+            });
+          }
+
+          debtor.amountOwed -= amount;
+          creditor.amountDue -= amount;
+
+          if (debtor.amountOwed < 0.01) dIdx++;
+          if (creditor.amountDue < 0.01) cIdx++;
+        }
+
+        return {
+          totalSpent: Math.round(totalSpent * 100) / 100,
+          userSettlements,
+          transfers,
+        };
+      },
 
       // ── Upgrade Actions ───────────────────────────────────
       addUpgradeToProject: (upgradeOptionId, customPrice) => {
@@ -643,7 +860,7 @@ export const useRenovationStore = create<RenovationStore>()(
           .reduce((sum, m) => sum + m.totalPrice, 0),
     }),
     {
-      name: 'project-planner-v5',
+      name: 'project-planner-v6',
       storage: createJSONStorage(() => localStorage),
       // Persist data and user state
       partialize: (state) => ({
@@ -658,6 +875,7 @@ export const useRenovationStore = create<RenovationStore>()(
         currentUser: state.currentUser,
         availableUpgrades: state.availableUpgrades,
         projectUpgrades: state.projectUpgrades,
+        expenses: state.expenses,
         activeView: state.activeView,
         ganttViewMode: state.ganttViewMode,
         isDarkMode: state.isDarkMode,

@@ -7,7 +7,9 @@ import { TaskModal } from './components/TaskModal';
 import { PersonsModal } from './components/PersonsModal';
 import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
-import { GanttChart, LayoutGrid, List, Wallet, Sparkles } from 'lucide-react';
+import { ExpenseModal } from './components/ExpenseModal';
+import { InviteModal } from './components/InviteModal';
+import { GanttChart, LayoutGrid, List, Wallet, Sparkles, Receipt } from 'lucide-react';
 import type { ActiveView } from './types';
 
 // Lazy-loaded views
@@ -15,21 +17,23 @@ const GanttView    = lazy(() => import('./views/GanttView').then(m => ({ default
 const KanbanView   = lazy(() => import('./views/KanbanView').then(m => ({ default: m.KanbanView })));
 const ListView     = lazy(() => import('./views/ListView').then(m => ({ default: m.ListView })));
 const BudgetView   = lazy(() => import('./views/BudgetView').then(m => ({ default: m.BudgetView })));
+const ExpensesView = lazy(() => import('./views/ExpensesView').then(m => ({ default: m.ExpensesView })));
 const UpgradesView = lazy(() => import('./views/UpgradesView').then(m => ({ default: m.UpgradesView })));
 
 // Loading spinner voor Suspense-boundary
 const ViewLoader = () => (
   <div className="flex-1 flex items-center justify-center h-full">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
   </div>
 );
 
 const MOBILE_NAV: { id: ActiveView; label: string; icon: React.ElementType }[] = [
-  { id: 'gantt',    label: 'Gantt',    icon: GanttChart },
-  { id: 'kanban',   label: 'Kanban',   icon: LayoutGrid },
-  { id: 'list',     label: 'Lijst',    icon: List },
-  { id: 'budget',   label: 'Budget',   icon: Wallet },
-  { id: 'upgrades', label: 'Upgrades', icon: Sparkles },
+  { id: 'gantt',    label: 'Gantt',     icon: GanttChart },
+  { id: 'kanban',   label: 'Kanban',    icon: LayoutGrid },
+  { id: 'list',     label: 'Lijst',     icon: List },
+  { id: 'budget',   label: 'Budget',    icon: Wallet },
+  { id: 'expenses', label: 'Bonnen',    icon: Receipt },
+  { id: 'upgrades', label: 'Upgrades',  icon: Sparkles },
 ];
 
 function App() {
@@ -61,6 +65,7 @@ function App() {
             {activeView === 'kanban'   && <KanbanView />}
             {activeView === 'list'     && <ListView />}
             {activeView === 'budget'   && <BudgetView />}
+            {activeView === 'expenses' && <ExpensesView />}
             {activeView === 'upgrades' && <UpgradesView />}
           </Suspense>
         </main>
@@ -73,26 +78,23 @@ function App() {
               onClick={() => setActiveView(id)}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 text-xs font-medium
                 transition-colors
-                ${activeView === id ? 'text-primary-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                ${activeView === id ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
             >
-              <Icon className={`w-5 h-5 ${activeView === id ? 'text-primary-500' : ''}`} />
+              <Icon className={`w-5 h-5 ${activeView === id ? 'text-emerald-500' : ''}`} />
               {label}
             </button>
           ))}
         </nav>
       </div>
 
-      {/* Task detail modal */}
+      {/* Modals */}
       <TaskModal />
-
-      {/* People management modal */}
       <PersonsModal />
-
-      {/* Multi-user Auth & Account modal */}
       <AuthModal />
+      <ExpenseModal />
+      <InviteModal />
     </div>
   );
 }
 
 export default App;
-

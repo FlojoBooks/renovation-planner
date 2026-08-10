@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRenovationStore } from '../store/useRenovationStore';
-import { Search, X, Plus, SlidersHorizontal, UserCheck, Users } from 'lucide-react';
+import { Search, X, Plus, SlidersHorizontal, UserCheck, Users, UserPlus } from 'lucide-react';
 import type { TaskStatus, TaskPriority } from '../types';
 import { STATUS_LABELS, PRIORITY_LABELS } from '../utils';
 
@@ -25,6 +25,7 @@ export function TopBar() {
     persons,
     currentUser,
     openAuthModal,
+    openInviteModal,
     openTaskModal,
     ganttViewMode,
     setGanttViewMode,
@@ -218,6 +219,17 @@ export function TopBar() {
       >
         <Plus className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Taak</span>
+      </button>
+
+      {/* Invite team member button */}
+      <button
+        onClick={openInviteModal}
+        className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/80
+          text-blue-600 dark:text-blue-400 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors shadow-sm shrink-0"
+        title="Genereer private uitnodigingslink"
+      >
+        <UserPlus className="w-3.5 h-3.5" />
+        <span>Uitnodigen</span>
       </button>
 
       {/* User profile button (top right) */}
