@@ -860,7 +860,7 @@ export const useRenovationStore = create<RenovationStore>()(
           .reduce((sum, m) => sum + m.totalPrice, 0),
     }),
     {
-      name: 'project-planner-v6',
+      name: 'project-planner-v7',
       storage: createJSONStorage(() => localStorage),
       // Persist data and user state
       partialize: (state) => ({

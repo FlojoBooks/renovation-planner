@@ -30,33 +30,9 @@ export const seedProject: Project = {
   updatedAt: now,
 };
 
-// ── Initiële Gebruiker ─────────────────────────────────────
-export const seedUsers: User[] = [
-  {
-    id: 'user-1',
-    name: 'Mijn Account',
-    email: 'eigenaar@project.nl',
-    role: 'owner',
-    roleTitle: 'Projecteigenaar',
-    avatarColor: '#0ea5e9',
-    avatarInitials: 'IK',
-    createdAt: now,
-  },
-];
-
-// ── Initiële Contactpersoon ────────────────────────────────
-export const seedPersons: Person[] = [
-  {
-    id: 'person-1',
-    name: 'Ik',
-    label: 'Ik',
-    color: '#0ea5e9',
-    avatarInitials: 'IK',
-    role: 'owner',
-    userId: 'user-1',
-    createdAt: now,
-  },
-];
+// ── Geen voorgedefinieerde gebruikers (start volledig schoon) ─
+export const seedUsers: User[] = [];
+export const seedPersons: Person[] = [];
 
 // ── Geen hardcoded testdata ────────────────────────────────
 export const seedSubprojects: Subproject[] = [];
@@ -150,7 +126,7 @@ export const seedData = {
   comments: seedComments,
   budgetLines: seedBudgetLines,
   users: seedUsers,
-  currentUser: seedUsers[0],
+  currentUser: null as User | null,
   availableUpgrades: seedAvailableUpgrades,
   projectUpgrades: seedProjectUpgrades,
 };
