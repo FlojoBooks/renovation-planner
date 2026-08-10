@@ -27,7 +27,10 @@ import type {
 import { seedData } from '../data/seed';
 import { generateId, formatISODate } from '../utils';
 import { hashPassword, verifyPassword, generateInviteToken } from '../utils/crypto';
+import { pushStateToServer } from '../hooks/useSocket';
 import { addDays, format } from 'date-fns';
+
+let isApplyingRemoteState = false;
 
 const now = () => new Date().toISOString();
 
@@ -510,6 +513,57 @@ export const useRenovationStore = create<RenovationStore>()(
             .filter(Boolean) as Subproject[],
         })),
 
+      // ── Remote Sync Action ────────────────────────────────
+      applyRemoteState: (remote) => {
+        if (!remote || typeof remote !== 'object') return;
+        isApplyingRemoteState = true;
+        set((s) => {
+          const updates: Partial<RenovationStore> = {};
+          if (remote.project && remote.project.name) {
+            updates.project = remote.project;
+          }
+          if (Array.isArray(remote.subprojects) && remote.subprojects.length > 0) {
+            updates.subprojects = remote.subprojects;
+          }
+          if (Array.isArray(remote.tasks)) {
+            updates.tasks = remote.tasks;
+          }
+          if (Array.isArray(remote.persons)) {
+            const personMap = new Map(s.persons.map((p) => [p.id, p]));
+            remote.persons.forEach((p: Person) => personMap.set(p.id, { ...personMap.get(p.id), ...p }));
+            updates.persons = Array.from(personMap.values());
+          }
+          if (Array.isArray(remote.users)) {
+            const userMap = new Map(s.users.map((u) => [u.id, u]));
+            remote.users.forEach((u: User) => userMap.set(u.id, { ...userMap.get(u.id), ...u }));
+            updates.users = Array.from(userMap.values());
+            // If current user is in users list, sync properties
+            if (s.currentUser) {
+              const updatedCurrent = userMap.get(s.currentUser.id);
+              if (updatedCurrent) {
+                updates.currentUser = updatedCurrent;
+              }
+            }
+          }
+          if (Array.isArray(remote.expenses)) {
+            updates.expenses = remote.expenses;
+          }
+          if (Array.isArray(remote.materials)) {
+            updates.materials = remote.materials;
+          }
+          if (Array.isArray(remote.comments)) {
+            updates.comments = remote.comments;
+          }
+          if (Array.isArray(remote.budgetLines)) {
+            updates.budgetLines = remote.budgetLines;
+          }
+          return updates;
+        });
+        setTimeout(() => {
+          isApplyingRemoteState = false;
+        }, 100);
+      },
+
       // ── Task Actions ──────────────────────────────────────
       addTask: (task) => {
         let subprojectId = task.subprojectId;
@@ -912,4 +966,12 @@ export const useRenovationStore = create<RenovationStore>()(
     }
   )
 );
+
+// Automatische live synchronisatie naar server bij wijzigingen
+useRenovationStore.subscribe((state) => {
+  if (!isApplyingRemoteState) {
+    pushStateToServer(state);
+  }
+});
+
 

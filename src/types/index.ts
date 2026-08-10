@@ -439,6 +439,9 @@ export interface RenovationStore {
   toggleSubprojectCollapsed: (id: string) => void;
   reorderSubprojects: (orderedIds: string[]) => void;
 
+  // ── Sync Actions ──────────────────────────────────────────
+  applyRemoteState: (remote: any) => void;
+
   // ── Task Actions ──────────────────────────────────────────
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'materialIds' | 'commentIds' | 'progress'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;

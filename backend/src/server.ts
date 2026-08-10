@@ -11,6 +11,7 @@ import { personRouter } from './routes/persons';
 import { materialRouter } from './routes/materials';
 import { commentRouter } from './routes/comments';
 import { budgetRouter } from './routes/budget';
+import { syncRouter } from './routes/sync';
 import { registerSocketHandlers } from './socket/handlers';
 
 dotenv.config();
@@ -43,6 +44,7 @@ app.get('/health', (_req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+app.use('/api/sync', syncRouter);
 app.use('/api/project', projectRouter);
 app.use('/api/subprojects', subprojectRouter);
 app.use('/api/tasks', taskRouter);

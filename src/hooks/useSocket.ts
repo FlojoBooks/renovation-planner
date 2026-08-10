@@ -9,12 +9,12 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (isDev ? 'http://localhost
 
 let socketInstance: Socket | null = null;
 
-function getSocket(): Socket {
+export function getSocket(): Socket {
   if (!socketInstance || !socketInstance.connected) {
     socketInstance = io(SOCKET_URL, {
       path: '/socket.io',
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1500,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
       transports: ['websocket', 'polling'],
       autoConnect: true,
     });
@@ -22,15 +22,95 @@ function getSocket(): Socket {
   return socketInstance;
 }
 
+let syncTimeout: any = null;
+
+export function pushStateToServer(state: any) {
+  if (syncTimeout) clearTimeout(syncTimeout);
+
+  syncTimeout = setTimeout(async () => {
+    try {
+      const payload = {
+        project: state.project,
+        subprojects: state.subprojects,
+        tasks: state.tasks,
+        persons: state.persons,
+        materials: state.materials,
+        comments: state.comments,
+        budgetLines: state.budgetLines,
+        users: state.users,
+        expenses: state.expenses,
+      };
+
+      // 1. REST push
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+
+      // 2. Socket push
+      const socket = getSocket();
+      if (socket && socket.connected) {
+        socket.emit('state:update', payload);
+      }
+    } catch (e) {
+      console.warn('Sync push error:', e);
+    }
+  }, 150);
+}
+
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
   const store = useRenovationStore();
 
   useEffect(() => {
+    // 1. Initial REST Sync to instantly pull server data (for new users or on refresh)
+    async function initSync() {
+      try {
+        const res = await fetch('/api/sync');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const serverData = json.data;
+            const hasServerData =
+              (serverData.tasks && serverData.tasks.length > 0) ||
+              (serverData.subprojects && serverData.subprojects.length > 0) ||
+              (serverData.users && serverData.users.length > 0);
+
+            if (hasServerData) {
+              store.applyRemoteState(serverData);
+            } else {
+              // Server is empty, if local has data, push it to server
+              const localTasks = store.tasks;
+              const localSubprojects = store.subprojects;
+              if (localTasks.length > 0 || localSubprojects.length > 0 || store.users.length > 0) {
+                pushStateToServer(store);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Initial sync error:', err);
+      }
+    }
+
+    initSync();
+
     const socket = getSocket();
     socketRef.current = socket;
 
-    // ── Incoming real-time events from other clients ──────
+    // 2. Full shared state synchronization event
+    socket.on('state:synced', (remoteState: any) => {
+      if (remoteState) {
+        store.applyRemoteState(remoteState);
+      }
+    });
+
+    socket.on('connect', () => {
+      socket.emit('state:request');
+    });
+
+    // ── Incoming granular real-time events from other clients ──────
 
     // Tasks
     socket.on('task:updated', ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
@@ -38,7 +118,6 @@ export function useSocket() {
     });
 
     socket.on('task:completed', ({ id, isCompleted }: { id: string; isCompleted: boolean }) => {
-      // Only toggle if state is different to avoid infinite loop
       const current = store.getTaskById(id);
       if (current && current.isCompleted !== isCompleted) {
         store.toggleTaskComplete(id);
@@ -93,6 +172,7 @@ export function useSocket() {
     });
 
     return () => {
+      socket.off('state:synced');
       socket.off('task:updated');
       socket.off('task:completed');
       socket.off('task:datesUpdated');

@@ -9,7 +9,7 @@ import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
 import { ExpenseModal } from './components/ExpenseModal';
 import { InviteModal } from './components/InviteModal';
-import { GanttChart, LayoutGrid, List, Wallet, Sparkles, Receipt } from 'lucide-react';
+import { GanttChart, LayoutGrid, List, Wallet, Receipt } from 'lucide-react';
 import type { ActiveView } from './types';
 
 // Lazy-loaded views
@@ -18,12 +18,11 @@ const KanbanView   = lazy(() => import('./views/KanbanView').then(m => ({ defaul
 const ListView     = lazy(() => import('./views/ListView').then(m => ({ default: m.ListView })));
 const BudgetView   = lazy(() => import('./views/BudgetView').then(m => ({ default: m.BudgetView })));
 const ExpensesView = lazy(() => import('./views/ExpensesView').then(m => ({ default: m.ExpensesView })));
-const UpgradesView = lazy(() => import('./views/UpgradesView').then(m => ({ default: m.UpgradesView })));
 
 // Loading spinner voor Suspense-boundary
 const ViewLoader = () => (
   <div className="flex-1 flex items-center justify-center h-full">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
   </div>
 );
 
@@ -33,7 +32,6 @@ const MOBILE_NAV: { id: ActiveView; label: string; icon: React.ElementType }[] =
   { id: 'list',     label: 'Lijst',     icon: List },
   { id: 'budget',   label: 'Budget',    icon: Wallet },
   { id: 'expenses', label: 'Bonnen',    icon: Receipt },
-  { id: 'upgrades', label: 'Upgrades',  icon: Sparkles },
 ];
 
 function App() {
@@ -75,7 +73,6 @@ function App() {
             {activeView === 'list'     && <ListView />}
             {activeView === 'budget'   && <BudgetView />}
             {activeView === 'expenses' && <ExpensesView />}
-            {activeView === 'upgrades' && <UpgradesView />}
           </Suspense>
         </main>
 

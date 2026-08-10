@@ -1,6 +1,25 @@
 import { Server, Socket } from 'socket.io';
+import { getSharedState, updateSharedState } from '../routes/sync';
 
 export function registerSocketHandlers(io: Server, socket: Socket): void {
+  // ─── Shared full state sync events ────────────────────────────────────────
+
+  // When a client requests current shared state
+  socket.on('state:request', () => {
+    socket.emit('state:synced', getSharedState());
+  });
+
+  // When a client updates state
+  socket.on('state:update', (incomingState: Record<string, unknown>) => {
+    try {
+      const updated = updateSharedState(incomingState);
+      // Broadcast new state to all clients
+      io.emit('state:synced', updated);
+    } catch (e) {
+      console.warn('Failed to update shared state from socket:', e);
+    }
+  });
+
   // ─── Task events ──────────────────────────────────────────────────────────
 
   socket.on('task:update', (data: { id: string; updates: Record<string, unknown> }) => {

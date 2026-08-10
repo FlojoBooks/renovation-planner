@@ -5,11 +5,9 @@ import {
   List,
   GanttChart,
   Wallet,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   Plus,
-  Home,
   Settings,
   Moon,
   Sun,
@@ -34,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'list',     label: 'Lijst',              icon: List },
   { id: 'budget',   label: 'Budget',             icon: Wallet },
   { id: 'expenses', label: 'Betalingen & Bonnen', icon: Receipt },
-  { id: 'upgrades', label: 'Upgrades',           icon: Sparkles },
 ];
 
 export function Sidebar() {
