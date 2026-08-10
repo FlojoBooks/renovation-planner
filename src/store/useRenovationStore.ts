@@ -9,6 +9,10 @@ import type {
   Material,
   Comment,
   BudgetLine,
+  User,
+  UpgradeOption,
+  ProjectUpgrade,
+  UpgradeStatus,
   TaskStatus,
   TaskPriority,
   ActiveView,
@@ -18,6 +22,7 @@ import type {
 } from '../types';
 import { seedData } from '../data/seed';
 import { generateId, formatISODate } from '../utils';
+import { addDays, format } from 'date-fns';
 
 const now = () => new Date().toISOString();
 
@@ -32,6 +37,10 @@ export const useRenovationStore = create<RenovationStore>()(
       materials: seedData.materials,
       comments: seedData.comments,
       budgetLines: seedData.budgetLines,
+      users: seedData.users,
+      currentUser: seedData.currentUser,
+      availableUpgrades: seedData.availableUpgrades,
+      projectUpgrades: seedData.projectUpgrades,
 
       // ── UI State ─────────────────────────────────────────
       activeView: 'gantt' as ActiveView,
@@ -40,12 +49,188 @@ export const useRenovationStore = create<RenovationStore>()(
       ganttViewMode: 'Week' as GanttViewMode,
       isTaskModalOpen: false,
       isPersonsModalOpen: false,
+      isAuthModalOpen: false,
       isSidebarCollapsed: false,
       isDarkMode: false,
       searchQuery: '',
       filterAssigneeIds: [],
       filterStatus: [],
       filterPriority: [],
+      filterOnlyMyTasks: false,
+
+      // ── Auth Actions ──────────────────────────────────────
+      setCurrentUser: (user) => set({ currentUser: user }),
+
+      registerUser: (userData) => {
+        const id = generateId('user');
+        const newUser: User = {
+          ...userData,
+          id,
+          createdAt: now(),
+        };
+
+        // Also create/link a corresponding Person for task assignment
+        const newPerson: Person = {
+          id: generateId('person'),
+          name: newUser.name,
+          label: newUser.name.split(' ')[0],
+          color: newUser.avatarColor,
+          avatarInitials: newUser.avatarInitials,
+          email: newUser.email,
+          role: newUser.role,
+          userId: id,
+          createdAt: now(),
+        };
+
+        set((s) => ({
+          users: [...s.users, newUser],
+          persons: [...s.persons, newPerson],
+          currentUser: newUser,
+        }));
+
+        return newUser;
+      },
+
+      switchUser: (userId) => {
+        const user = get().users.find((u) => u.id === userId);
+        if (user) {
+          set({ currentUser: user });
+        }
+      },
+
+      logoutUser: () => set({ currentUser: null }),
+
+      openAuthModal: () => set({ isAuthModalOpen: true }),
+      closeAuthModal: () => set({ isAuthModalOpen: false }),
+
+      // ── Upgrade Actions ───────────────────────────────────
+      addUpgradeToProject: (upgradeOptionId, customPrice) => {
+        const upgrade = get().availableUpgrades.find((u) => u.id === upgradeOptionId);
+        if (!upgrade) return;
+
+        const price = customPrice ?? upgrade.estimatedCost;
+        const projectUpgradeId = generateId('proj-upg');
+
+        // Check if there is a matching subproject or create one
+        let targetSubproject = get().subprojects.find(
+          (sp) => sp.name.toLowerCase().includes(upgrade.title.toLowerCase().slice(0, 8))
+        );
+
+        const createdDate = new Date();
+        const startIso = format(createdDate, 'yyyy-MM-dd');
+        const endIso = format(addDays(createdDate, 30), 'yyyy-MM-dd');
+
+        if (!targetSubproject) {
+          const newSubprojectId = generateId('sub');
+          const newSub: Subproject = {
+            id: newSubprojectId,
+            name: `Upgrade: ${upgrade.title}`,
+            description: upgrade.description,
+            color: 'teal',
+            startDate: startIso,
+            endDate: endIso,
+            isCollapsed: false,
+            order: get().subprojects.length,
+            createdAt: now(),
+            updatedAt: now(),
+          };
+          set((s) => ({ subprojects: [...s.subprojects, newSub] }));
+          targetSubproject = newSub;
+        }
+
+        const projectUpgrade: ProjectUpgrade = {
+          id: projectUpgradeId,
+          upgradeOptionId: upgrade.id,
+          title: upgrade.title,
+          category: upgrade.category,
+          status: 'approved',
+          agreedPrice: price,
+          subprojectId: targetSubproject.id,
+          addedAt: now(),
+        };
+
+        // Create tasks based on template
+        const newTasks: Task[] = upgrade.tasksTemplate.map((tpl, index) => {
+          const taskStart = format(addDays(createdDate, tpl.daysOffset), 'yyyy-MM-dd');
+          const taskEnd = format(addDays(createdDate, tpl.daysOffset + tpl.durationDays), 'yyyy-MM-dd');
+          return {
+            id: generateId('task'),
+            subprojectId: targetSubproject!.id,
+            title: tpl.title,
+            description: tpl.description || `Onderdeel van upgrade ${upgrade.title}`,
+            status: 'todo',
+            priority: tpl.priority,
+            startDate: taskStart,
+            endDate: taskEnd,
+            dependencies: [],
+            assigneeIds: [],
+            progress: 0,
+            isCompleted: false,
+            estimatedHours: tpl.estimatedHours || 8,
+            order: index,
+            tags: ['upgrade', upgrade.category],
+            materialIds: [],
+            commentIds: [],
+            upgradeId: projectUpgradeId,
+            createdAt: now(),
+            updatedAt: now(),
+          };
+        });
+
+        // Add a budget line
+        const newBudgetLine: BudgetLine = {
+          id: generateId('budget'),
+          subprojectId: targetSubproject.id,
+          upgradeId: projectUpgradeId,
+          description: `Meerwerk Upgrade: ${upgrade.title}`,
+          category: 'other',
+          estimated: price,
+          actual: 0,
+          isPaid: false,
+          notes: `Toegevoegd via Upgrade module. ${upgrade.roiBadge || ''}`,
+          createdAt: now(),
+          updatedAt: now(),
+        };
+
+        set((s) => ({
+          projectUpgrades: [...s.projectUpgrades, projectUpgrade],
+          tasks: [...s.tasks, ...newTasks],
+          budgetLines: [...s.budgetLines, newBudgetLine],
+        }));
+      },
+
+      removeUpgradeFromProject: (projectUpgradeId) => {
+        set((s) => ({
+          projectUpgrades: s.projectUpgrades.filter((u) => u.id !== projectUpgradeId),
+          tasks: s.tasks.filter((t) => t.upgradeId !== projectUpgradeId),
+          budgetLines: s.budgetLines.filter((b) => b.upgradeId !== projectUpgradeId),
+        }));
+      },
+
+      updateUpgradeStatus: (projectUpgradeId, status: UpgradeStatus) => {
+        set((s) => ({
+          projectUpgrades: s.projectUpgrades.map((u) =>
+            u.id === projectUpgradeId
+              ? {
+                  ...u,
+                  status,
+                  completedAt: status === 'completed' ? now() : u.completedAt,
+                }
+              : u
+          ),
+        }));
+      },
+
+      createCustomUpgrade: (upgradeData) => {
+        const id = generateId('upg-custom');
+        const newUpgrade: UpgradeOption = {
+          ...upgradeData,
+          id,
+        };
+        set((s) => ({
+          availableUpgrades: [newUpgrade, ...s.availableUpgrades],
+        }));
+      },
 
       // ── Project Actions ───────────────────────────────────
       updateProject: (updates: Partial<Project>) =>
@@ -131,20 +316,45 @@ export const useRenovationStore = create<RenovationStore>()(
           comments: s.comments.filter((c) => c.taskId !== id),
         })),
 
-      toggleTaskComplete: (id) =>
+      toggleTaskComplete: (id, completionNote) => {
+        const { currentUser } = get();
+        set((s) => ({
+          tasks: s.tasks.map((t) => {
+            if (t.id !== id) return t;
+            const willBeCompleted = !t.isCompleted;
+            return {
+              ...t,
+              isCompleted: willBeCompleted,
+              status: willBeCompleted ? 'done' : 'todo',
+              progress: willBeCompleted ? 100 : 0,
+              completedAt: willBeCompleted ? now() : undefined,
+              completionNote: willBeCompleted ? (completionNote || t.completionNote) : undefined,
+              completedByUserId: willBeCompleted ? currentUser?.id : undefined,
+              updatedAt: now(),
+            };
+          }),
+        }));
+      },
+
+      markTaskCompleteWithDetails: (id, note) => {
+        const { currentUser } = get();
         set((s) => ({
           tasks: s.tasks.map((t) =>
             t.id === id
               ? {
                   ...t,
-                  isCompleted: !t.isCompleted,
-                  status: !t.isCompleted ? 'done' : 'todo',
-                  progress: !t.isCompleted ? 100 : 0,
+                  isCompleted: true,
+                  status: 'done',
+                  progress: 100,
+                  completedAt: now(),
+                  completionNote: note || 'Taak succesvol gereedgemeld en goedgekeurd.',
+                  completedByUserId: currentUser?.id,
                   updatedAt: now(),
                 }
               : t
           ),
-        })),
+        }));
+      },
 
       moveTask: (taskId, newSubprojectId) =>
         set((s) => ({
@@ -216,7 +426,6 @@ export const useRenovationStore = create<RenovationStore>()(
           materials: s.materials.map((m) => {
             if (m.id !== id) return m;
             const updated = { ...m, ...updates, updatedAt: now() };
-            // Recalculate total if quantity or unitPrice changed
             if (updates.quantity !== undefined || updates.unitPrice !== undefined) {
               updated.totalPrice = updated.quantity * updated.unitPrice;
             }
@@ -309,7 +518,6 @@ export const useRenovationStore = create<RenovationStore>()(
       toggleDarkMode: () =>
         set((s) => {
           const next = !s.isDarkMode;
-          // Apply to <html> element for Tailwind dark class
           if (next) document.documentElement.classList.add('dark');
           else document.documentElement.classList.remove('dark');
           return { isDarkMode: next };
@@ -321,8 +529,9 @@ export const useRenovationStore = create<RenovationStore>()(
       setFilterAssignees: (ids) => set({ filterAssigneeIds: ids }),
       setFilterStatus: (statuses) => set({ filterStatus: statuses }),
       setFilterPriority: (priorities) => set({ filterPriority: priorities }),
+      toggleFilterOnlyMyTasks: () => set((s) => ({ filterOnlyMyTasks: !s.filterOnlyMyTasks })),
       clearFilters: () =>
-        set({ searchQuery: '', filterAssigneeIds: [], filterStatus: [], filterPriority: [] }),
+        set({ searchQuery: '', filterAssigneeIds: [], filterStatus: [], filterPriority: [], filterOnlyMyTasks: false }),
 
       // ── Computed Selectors ─────────────────────────────────
       getTasksBySubproject: (subprojectId) =>
@@ -331,14 +540,36 @@ export const useRenovationStore = create<RenovationStore>()(
           .sort((a, b) => a.order - b.order),
 
       getFilteredTasks: () => {
-        const { tasks, searchQuery, filterAssigneeIds, filterStatus, filterPriority, activeSubprojectId } =
-          get();
+        const {
+          tasks,
+          searchQuery,
+          filterAssigneeIds,
+          filterStatus,
+          filterPriority,
+          activeSubprojectId,
+          filterOnlyMyTasks,
+          currentUser,
+          persons,
+        } = get();
+
+        // If filterOnlyMyTasks is active, determine the corresponding personId
+        let myPersonIds: string[] = [];
+        if (filterOnlyMyTasks && currentUser) {
+          myPersonIds = persons
+            .filter((p) => p.userId === currentUser.id || p.email === currentUser.email)
+            .map((p) => p.id);
+        }
+
         return tasks.filter((t) => {
           if (activeSubprojectId && t.subprojectId !== activeSubprojectId) return false;
           if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
           if (filterAssigneeIds.length && !filterAssigneeIds.some((id) => t.assigneeIds.includes(id))) return false;
           if (filterStatus.length && !filterStatus.includes(t.status)) return false;
           if (filterPriority.length && !filterPriority.includes(t.priority)) return false;
+          if (filterOnlyMyTasks) {
+            if (myPersonIds.length === 0) return false;
+            if (!myPersonIds.some((id) => t.assigneeIds.includes(id))) return false;
+          }
           return true;
         });
       },
@@ -399,9 +630,9 @@ export const useRenovationStore = create<RenovationStore>()(
           .reduce((sum, m) => sum + m.totalPrice, 0),
     }),
     {
-      name: 'renovation-planner-v1',
+      name: 'project-planner-v4',
       storage: createJSONStorage(() => localStorage),
-      // Only persist data, not UI state
+      // Persist data and user state
       partialize: (state) => ({
         project: state.project,
         subprojects: state.subprojects,
@@ -410,6 +641,10 @@ export const useRenovationStore = create<RenovationStore>()(
         materials: state.materials,
         comments: state.comments,
         budgetLines: state.budgetLines,
+        users: state.users,
+        currentUser: state.currentUser,
+        availableUpgrades: state.availableUpgrades,
+        projectUpgrades: state.projectUpgrades,
         activeView: state.activeView,
         ganttViewMode: state.ganttViewMode,
         isDarkMode: state.isDarkMode,
@@ -417,3 +652,4 @@ export const useRenovationStore = create<RenovationStore>()(
     }
   )
 );
+

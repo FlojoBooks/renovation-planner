@@ -21,7 +21,31 @@ export type SubprojectColor =
 
 export type GanttViewMode = 'Day' | 'Week' | 'Month';
 
-export type ActiveView = 'gantt' | 'kanban' | 'list' | 'budget';
+export type ActiveView = 'gantt' | 'kanban' | 'list' | 'budget' | 'upgrades';
+
+// ============================================================
+// USERS & ROLES
+// ============================================================
+
+export type UserRole =
+  | 'owner'         // Opdrachtgever / Eigenaar
+  | 'partner'       // Partner / Mede-eigenaar
+  | 'contractor'    // Hoofdaannemer
+  | 'subcontractor' // Onderaannemer / Vakman (bijv. elektricien, loodgieter)
+  | 'architect';    // Architect / Adviseur
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  roleTitle?: string;
+  company?: string;
+  phone?: string;
+  avatarColor: string;
+  avatarInitials: string;
+  createdAt: string;
+}
 
 // ============================================================
 // PEOPLE / RESOURCES
@@ -37,6 +61,8 @@ export interface Person {
   /** Optional email for future collaboration features */
   email?: string;
   avatarInitials: string;
+  role?: UserRole;
+  userId?: string; // Optional reference to registered User
   createdAt: string; // ISO date string
 }
 
@@ -109,6 +135,54 @@ export interface Attachment {
 }
 
 // ============================================================
+// UPGRADES & MEERWERK
+// ============================================================
+
+export type UpgradeCategory =
+  | 'technique'       // Techniek, Motor & Carrosserie
+  | 'interior'        // Interieur, Afwerking & Ruimte
+  | 'equipment'       // Apparatuur, Keuken & Installaties
+  | 'sustainability'  // Duurzaamheid, Accu & Elektra
+  | 'branding'        // Branding, Styling & Show
+  | 'custom';         // Maatwerk
+
+export type UpgradeStatus = 'available' | 'requested' | 'approved' | 'in_progress' | 'completed';
+
+export interface UpgradeTaskTemplate {
+  title: string;
+  description?: string;
+  estimatedHours?: number;
+  priority: TaskPriority;
+  daysOffset: number; // relative start day
+  durationDays: number;
+}
+
+export interface UpgradeOption {
+  id: string;
+  title: string;
+  description: string;
+  category: UpgradeCategory;
+  estimatedCost: number;
+  popular?: boolean;
+  roiBadge?: string; // e.g. "Bespaart €800/jaar" or "Waardevermeerderend"
+  tags: string[];
+  tasksTemplate: UpgradeTaskTemplate[];
+}
+
+export interface ProjectUpgrade {
+  id: string;
+  upgradeOptionId: string;
+  title: string;
+  category: UpgradeCategory;
+  status: UpgradeStatus;
+  agreedPrice: number;
+  notes?: string;
+  subprojectId?: string;
+  addedAt: string;
+  completedAt?: string;
+}
+
+// ============================================================
 // TASKS
 // ============================================================
 
@@ -135,6 +209,9 @@ export interface Task {
 
   /** Whether manually marked complete (separate from status) */
   isCompleted: boolean;
+  completedAt?: string;
+  completionNote?: string;
+  completedByUserId?: string;
 
   /** Estimated hours */
   estimatedHours?: number;
@@ -152,6 +229,9 @@ export interface Task {
   /** Linked comments (IDs) */
   commentIds: string[];
 
+  /** Linked upgrade ID (if originated from an upgrade) */
+  upgradeId?: string;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -164,6 +244,7 @@ export interface BudgetLine {
   id: string;
   subprojectId: string;
   taskId?: string; // optional: tied to a specific task
+  upgradeId?: string; // optional: tied to an upgrade
   description: string;
   category: BudgetCategory;
   estimated: number;
@@ -233,6 +314,10 @@ export interface RenovationStore {
   materials: Material[];
   comments: Comment[];
   budgetLines: BudgetLine[];
+  users: User[];
+  currentUser: User | null;
+  availableUpgrades: UpgradeOption[];
+  projectUpgrades: ProjectUpgrade[];
 
   // ── UI State ──────────────────────────────────────────────
   activeView: ActiveView;
@@ -241,12 +326,28 @@ export interface RenovationStore {
   ganttViewMode: GanttViewMode;
   isTaskModalOpen: boolean;
   isPersonsModalOpen: boolean;
+  isAuthModalOpen: boolean;
   isSidebarCollapsed: boolean;
   isDarkMode: boolean;
   searchQuery: string;
   filterAssigneeIds: string[];
   filterStatus: TaskStatus[];
   filterPriority: TaskPriority[];
+  filterOnlyMyTasks: boolean;
+
+  // ── Auth Actions ──────────────────────────────────────────
+  setCurrentUser: (user: User | null) => void;
+  registerUser: (user: Omit<User, 'id' | 'createdAt'>) => User;
+  switchUser: (userId: string) => void;
+  logoutUser: () => void;
+  openAuthModal: () => void;
+  closeAuthModal: () => void;
+
+  // ── Upgrade Actions ───────────────────────────────────────
+  addUpgradeToProject: (upgradeOptionId: string, customPrice?: number) => void;
+  removeUpgradeFromProject: (projectUpgradeId: string) => void;
+  updateUpgradeStatus: (projectUpgradeId: string, status: UpgradeStatus) => void;
+  createCustomUpgrade: (upgrade: Omit<UpgradeOption, 'id'>) => void;
 
   // ── Project Actions ───────────────────────────────────────
   updateProject: (updates: Partial<Project>) => void;
@@ -262,7 +363,8 @@ export interface RenovationStore {
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'materialIds' | 'commentIds' | 'progress'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
-  toggleTaskComplete: (id: string) => void;
+  toggleTaskComplete: (id: string, completionNote?: string) => void;
+  markTaskCompleteWithDetails: (id: string, note?: string) => void;
   moveTask: (taskId: string, newSubprojectId: string) => void;
   reorderTasks: (subprojectId: string, orderedIds: string[]) => void;
   updateTaskDates: (id: string, startDate: string, endDate: string) => void;
@@ -303,6 +405,7 @@ export interface RenovationStore {
   setFilterAssignees: (ids: string[]) => void;
   setFilterStatus: (statuses: TaskStatus[]) => void;
   setFilterPriority: (priorities: TaskPriority[]) => void;
+  toggleFilterOnlyMyTasks: () => void;
   clearFilters: () => void;
 
   // ── Computed Selectors ────────────────────────────────────

@@ -5,6 +5,7 @@ import {
   List,
   GanttChart,
   Wallet,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -12,6 +13,7 @@ import {
   Settings,
   Moon,
   Sun,
+  Users,
 } from 'lucide-react';
 import type { ActiveView } from '../types';
 import { SUBPROJECT_COLOR_MAP } from '../utils';
@@ -24,10 +26,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'gantt',  label: 'Gantt',     icon: GanttChart },
-  { id: 'kanban', label: 'Kanban',    icon: LayoutGrid },
-  { id: 'list',   label: 'Lijst',     icon: List },
-  { id: 'budget', label: 'Budget',    icon: Wallet },
+  { id: 'gantt',    label: 'Gantt',     icon: GanttChart },
+  { id: 'kanban',   label: 'Kanban',    icon: LayoutGrid },
+  { id: 'list',     label: 'Lijst',     icon: List },
+  { id: 'budget',   label: 'Budget',    icon: Wallet },
+  { id: 'upgrades', label: 'Upgrades',  icon: Sparkles },
 ];
 
 export function Sidebar() {
@@ -44,6 +47,9 @@ export function Sidebar() {
     isDarkMode,
     toggleDarkMode,
     openPersonsModal,
+    project,
+    currentUser,
+    openAuthModal,
   } = useRenovationStore();
 
   const collapsed = isSidebarCollapsed;
@@ -57,13 +63,13 @@ export function Sidebar() {
     >
       {/* Logo / Header */}
       <div className={`flex items-center gap-3 px-4 py-4 border-b border-slate-700 dark:border-slate-800 ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center shrink-0">
-          <Home className="w-4 h-4 text-white" />
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+          <Layers className="w-4 h-4 text-white" />
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white dark:text-white truncate">Verbouwing</p>
-            <p className="text-xs text-slate-400 dark:text-slate-400 truncate">Planner 2025</p>
+            <p className="text-sm font-bold text-white truncate">{project?.name || 'Project Planner'}</p>
+            <p className="text-[11px] text-slate-400 truncate">Planning & Uitvoering</p>
           </div>
         )}
       </div>
@@ -192,28 +198,61 @@ export function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-slate-700 dark:border-slate-800 p-2 space-y-0.5">
+      <div className="border-t border-slate-700 dark:border-slate-800 p-2 space-y-1">
+        {/* User Account / Switcher */}
+        <button
+          onClick={openAuthModal}
+          className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl text-left bg-slate-800/80 hover:bg-slate-800 transition-colors border border-slate-700/60 ${
+            collapsed ? 'justify-center' : ''
+          }`}
+          title={currentUser ? `Ingelogd als: ${currentUser.name}` : 'Inloggen / Account kiezen'}
+        >
+          {currentUser ? (
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm"
+              style={{ backgroundColor: currentUser.avatarColor }}
+            >
+              {currentUser.avatarInitials}
+            </div>
+          ) : (
+            <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+              <Users className="w-3.5 h-3.5" />
+            </div>
+          )}
+
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate">
+                {currentUser?.name || 'Account kiezen'}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {currentUser?.roleTitle || 'Wissel / Registreer'}
+              </p>
+            </div>
+          )}
+        </button>
+
         {/* Dark mode toggle */}
         <button
           onClick={toggleDarkMode}
-          className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-slate-400
+          className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-xs text-slate-400
             hover:bg-slate-800 hover:text-white transition-colors
             ${collapsed ? 'justify-center' : ''}`}
           title={isDarkMode ? 'Licht thema' : 'Donker thema'}
         >
-          {isDarkMode ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
+          {isDarkMode ? <Sun className="w-3.5 h-3.5 shrink-0" /> : <Moon className="w-3.5 h-3.5 shrink-0" />}
           {!collapsed && <span>{isDarkMode ? 'Licht thema' : 'Donker thema'}</span>}
         </button>
 
         {/* Settings / Persons */}
         <button
           onClick={openPersonsModal}
-          className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-slate-400
+          className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-xs text-slate-400
             hover:bg-slate-800 hover:text-white transition-colors
             ${collapsed ? 'justify-center' : ''}`}
           title={collapsed ? 'Instellingen' : undefined}
         >
-          <Settings className="w-4 h-4 shrink-0" />
+          <Settings className="w-3.5 h-3.5 shrink-0" />
           {!collapsed && <span>Instellingen</span>}
         </button>
       </div>
@@ -223,3 +262,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

@@ -361,6 +361,64 @@ export function TaskModal() {
           {(activeTab === 'Details' || createMode) && (
             <div className="p-4 sm:p-6 space-y-5">
 
+              {/* Gereedmeld status box (in edit mode) */}
+              {!createMode && task && (
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    task.isCompleted
+                      ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800'
+                      : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        onClick={() => toggleTaskComplete(task.id)}
+                        className="transition-transform active:scale-95"
+                      >
+                        {task.isCompleted ? (
+                          <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Circle className="w-6 h-6 text-slate-400 hover:text-emerald-500" />
+                        )}
+                      </button>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">
+                          {task.isCompleted ? 'Taak is gereedgemeld' : 'Taak gereedmelden'}
+                        </p>
+                        {task.isCompleted ? (
+                          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                            {task.completedAt ? `Opgeleverd op ${formatDate(task.completedAt, 'd MMMM yyyy HH:mm')}` : 'Afgerond'}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Vink af zodra de werkzaamheden zijn voltooid
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => toggleTaskComplete(task.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        task.isCompleted
+                          ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20'
+                      }`}
+                    >
+                      {task.isCompleted ? 'Heropenen' : '✓ Gereedmelden'}
+                    </button>
+                  </div>
+
+                  {task.completionNote && (
+                    <div className="mt-2.5 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-200">
+                      <span className="font-semibold">Oplevernotitie: </span>
+                      {task.completionNote}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Status + Priority */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>

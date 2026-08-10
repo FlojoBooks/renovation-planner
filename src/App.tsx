@@ -5,15 +5,16 @@ import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { TaskModal } from './components/TaskModal';
 import { PersonsModal } from './components/PersonsModal';
-import { GanttChart, LayoutGrid, List, Wallet } from 'lucide-react';
+import { AuthModal } from './components/AuthModal';
+import { GanttChart, LayoutGrid, List, Wallet, Sparkles } from 'lucide-react';
 import type { ActiveView } from './types';
 
-// Lazy-loaded views — elke view wordt een apart async chunk
-// Initiële JS-payload daalt; browser laadt alleen de actieve view
-const GanttView  = lazy(() => import('./views/GanttView').then(m => ({ default: m.GanttView })));
-const KanbanView = lazy(() => import('./views/KanbanView').then(m => ({ default: m.KanbanView })));
-const ListView   = lazy(() => import('./views/ListView').then(m => ({ default: m.ListView })));
-const BudgetView = lazy(() => import('./views/BudgetView').then(m => ({ default: m.BudgetView })));
+// Lazy-loaded views
+const GanttView    = lazy(() => import('./views/GanttView').then(m => ({ default: m.GanttView })));
+const KanbanView   = lazy(() => import('./views/KanbanView').then(m => ({ default: m.KanbanView })));
+const ListView     = lazy(() => import('./views/ListView').then(m => ({ default: m.ListView })));
+const BudgetView   = lazy(() => import('./views/BudgetView').then(m => ({ default: m.BudgetView })));
+const UpgradesView = lazy(() => import('./views/UpgradesView').then(m => ({ default: m.UpgradesView })));
 
 // Loading spinner voor Suspense-boundary
 const ViewLoader = () => (
@@ -22,12 +23,12 @@ const ViewLoader = () => (
   </div>
 );
 
-
 const MOBILE_NAV: { id: ActiveView; label: string; icon: React.ElementType }[] = [
-  { id: 'gantt',  label: 'Gantt',  icon: GanttChart },
-  { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
-  { id: 'list',   label: 'Lijst',  icon: List },
-  { id: 'budget', label: 'Budget', icon: Wallet },
+  { id: 'gantt',    label: 'Gantt',    icon: GanttChart },
+  { id: 'kanban',   label: 'Kanban',   icon: LayoutGrid },
+  { id: 'list',     label: 'Lijst',    icon: List },
+  { id: 'budget',   label: 'Budget',   icon: Wallet },
+  { id: 'upgrades', label: 'Upgrades', icon: Sparkles },
 ];
 
 function App() {
@@ -50,10 +51,11 @@ function App() {
         {/* View area — takes remaining height, above mobile nav */}
         <main className="flex-1 overflow-hidden pb-0 md:pb-0">
           <Suspense fallback={<ViewLoader />}>
-            {activeView === 'gantt'  && <GanttView />}
-            {activeView === 'kanban' && <KanbanView />}
-            {activeView === 'list'   && <ListView />}
-            {activeView === 'budget' && <BudgetView />}
+            {activeView === 'gantt'    && <GanttView />}
+            {activeView === 'kanban'   && <KanbanView />}
+            {activeView === 'list'     && <ListView />}
+            {activeView === 'budget'   && <BudgetView />}
+            {activeView === 'upgrades' && <UpgradesView />}
           </Suspense>
         </main>
 
@@ -79,8 +81,12 @@ function App() {
 
       {/* People management modal */}
       <PersonsModal />
+
+      {/* Multi-user Auth & Account modal */}
+      <AuthModal />
     </div>
   );
 }
 
 export default App;
+

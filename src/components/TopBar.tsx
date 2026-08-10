@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRenovationStore } from '../store/useRenovationStore';
-import { Search, X, Plus, SlidersHorizontal } from 'lucide-react';
+import { Search, X, Plus, SlidersHorizontal, UserCheck, Users } from 'lucide-react';
 import type { TaskStatus, TaskPriority } from '../types';
 import { STATUS_LABELS, PRIORITY_LABELS } from '../utils';
 
@@ -19,8 +19,12 @@ export function TopBar() {
     setFilterAssignees,
     setFilterStatus,
     setFilterPriority,
+    filterOnlyMyTasks,
+    toggleFilterOnlyMyTasks,
     clearFilters,
     persons,
+    currentUser,
+    openAuthModal,
     openTaskModal,
     ganttViewMode,
     setGanttViewMode,
@@ -29,7 +33,8 @@ export function TopBar() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  const activeFilterCount = filterAssigneeIds.length + filterStatus.length + filterPriority.length;
+  const activeFilterCount =
+    filterAssigneeIds.length + filterStatus.length + filterPriority.length + (filterOnlyMyTasks ? 1 : 0);
 
   function toggleStatus(s: TaskStatus) {
     setFilterStatus(filterStatus.includes(s) ? filterStatus.filter((x) => x !== s) : [...filterStatus, s]);
@@ -111,6 +116,20 @@ export function TopBar() {
         className="sm:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg badge-btn"
       >
         <Search className="w-4 h-4" />
+      </button>
+
+      {/* Mijn Taken quick toggle button */}
+      <button
+        onClick={toggleFilterOnlyMyTasks}
+        title={filterOnlyMyTasks ? 'Toon alle taken' : 'Toon alleen mijn taken'}
+        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all border shrink-0 ${
+          filterOnlyMyTasks
+            ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/20'
+            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300'
+        }`}
+      >
+        <UserCheck className="w-3.5 h-3.5" />
+        <span className="hidden md:inline">Mijn Taken</span>
       </button>
 
       {/* Filter button */}
@@ -199,6 +218,34 @@ export function TopBar() {
       >
         <Plus className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Taak</span>
+      </button>
+
+      {/* User profile button (top right) */}
+      <button
+        onClick={openAuthModal}
+        className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors shrink-0"
+        title="Wissel account / Profiel beheren"
+      >
+        {currentUser ? (
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-sm"
+            style={{ backgroundColor: currentUser.avatarColor }}
+          >
+            {currentUser.avatarInitials}
+          </div>
+        ) : (
+          <div className="w-7 h-7 rounded-lg bg-slate-300 dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300">
+            <Users className="w-4 h-4" />
+          </div>
+        )}
+        <div className="hidden lg:block text-left">
+          <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+            {currentUser?.name.split(' ')[0] || 'Inloggen'}
+          </p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+            {currentUser?.roleTitle || 'Wissel account'}
+          </p>
+        </div>
       </button>
 
       {/* Close filter panel when clicking outside */}

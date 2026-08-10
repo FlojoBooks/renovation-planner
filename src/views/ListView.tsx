@@ -25,6 +25,27 @@ export function ListView() {
 
   const allTasks = getFilteredTasks();
 
+  if (allTasks.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center dark:bg-slate-950">
+        <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4 shadow-sm">
+          <Plus className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Nog geen taken in dit project</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
+          Begin met het plannen van je project door een eerste taak aan te maken.
+        </p>
+        <button
+          onClick={() => openTaskModal()}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Eerste Taak Aanmaken
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto p-6 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto space-y-4">
