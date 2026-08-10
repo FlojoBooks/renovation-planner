@@ -38,6 +38,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: UserRole;
   roleTitle?: string;
   company?: string;
@@ -337,6 +338,7 @@ export interface RenovationStore {
 
   // ── Auth Actions ──────────────────────────────────────────
   setCurrentUser: (user: User | null) => void;
+  loginUser: (email: string, password?: string) => { success: boolean; error?: string };
   registerUser: (user: Omit<User, 'id' | 'createdAt'>) => User;
   switchUser: (userId: string) => void;
   logoutUser: () => void;

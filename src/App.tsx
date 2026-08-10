@@ -6,6 +6,7 @@ import { TopBar } from './components/TopBar';
 import { TaskModal } from './components/TaskModal';
 import { PersonsModal } from './components/PersonsModal';
 import { AuthModal } from './components/AuthModal';
+import { LoginScreen } from './components/LoginScreen';
 import { GanttChart, LayoutGrid, List, Wallet, Sparkles } from 'lucide-react';
 import type { ActiveView } from './types';
 
@@ -32,8 +33,13 @@ const MOBILE_NAV: { id: ActiveView; label: string; icon: React.ElementType }[] =
 ];
 
 function App() {
-  const { activeView, setActiveView, isDarkMode } = useRenovationStore();
+  const { activeView, setActiveView, isDarkMode, currentUser } = useRenovationStore();
   useSocket();
+
+  // Als de gebruiker niet is ingelogd, toon het inlog- / registratiescherm
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className={`flex h-dvh overflow-hidden ${isDarkMode ? 'dark bg-slate-950' : 'bg-slate-50'}`}>

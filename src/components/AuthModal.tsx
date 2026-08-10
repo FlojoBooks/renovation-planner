@@ -186,7 +186,10 @@ export function AuthModal() {
                 <span>Selecteer actieve gebruiker</span>
                 {currentUser && (
                   <button
-                    onClick={() => logoutUser()}
+                    onClick={() => {
+                      logoutUser();
+                      closeAuthModal();
+                    }}
                     className="flex items-center gap-1 text-red-500 hover:text-red-600 normal-case font-medium"
                   >
                     <LogOut className="w-3.5 h-3.5" />

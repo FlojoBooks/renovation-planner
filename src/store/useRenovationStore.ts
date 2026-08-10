@@ -38,7 +38,7 @@ export const useRenovationStore = create<RenovationStore>()(
       comments: seedData.comments,
       budgetLines: seedData.budgetLines,
       users: seedData.users,
-      currentUser: seedData.currentUser,
+      currentUser: null, // Start on login screen if not logged in
       availableUpgrades: seedData.availableUpgrades,
       projectUpgrades: seedData.projectUpgrades,
 
@@ -60,6 +60,19 @@ export const useRenovationStore = create<RenovationStore>()(
 
       // ── Auth Actions ──────────────────────────────────────
       setCurrentUser: (user) => set({ currentUser: user }),
+
+      loginUser: (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = get().users.find((u) => u.email.toLowerCase() === normalizedEmail);
+        if (!user) {
+          return { success: false, error: 'Geen account gevonden met dit e-mailadres.' };
+        }
+        if (user.password && password && user.password !== password) {
+          return { success: false, error: 'Onjuist wachtwoord.' };
+        }
+        set({ currentUser: user });
+        return { success: true };
+      },
 
       registerUser: (userData) => {
         const id = generateId('user');
@@ -630,7 +643,7 @@ export const useRenovationStore = create<RenovationStore>()(
           .reduce((sum, m) => sum + m.totalPrice, 0),
     }),
     {
-      name: 'project-planner-v4',
+      name: 'project-planner-v5',
       storage: createJSONStorage(() => localStorage),
       // Persist data and user state
       partialize: (state) => ({
