@@ -14,6 +14,7 @@ import {
   Moon,
   Sun,
   Users,
+  Layers,
 } from 'lucide-react';
 import type { ActiveView } from '../types';
 import { SUBPROJECT_COLOR_MAP } from '../utils';
