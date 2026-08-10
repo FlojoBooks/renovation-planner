@@ -2,16 +2,21 @@ import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useRenovationStore } from '../store/useRenovationStore';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3001';
+const isBrowser = typeof window !== 'undefined';
+const isDev = isBrowser && window.location.hostname === 'localhost' && window.location.port === '3000';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (isDev ? 'http://localhost:3001' : '');
 
 let socketInstance: Socket | null = null;
 
 function getSocket(): Socket {
   if (!socketInstance || !socketInstance.connected) {
     socketInstance = io(SOCKET_URL, {
+      path: '/socket.io',
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionDelay: 1500,
       transports: ['websocket', 'polling'],
+      autoConnect: true,
     });
   }
   return socketInstance;

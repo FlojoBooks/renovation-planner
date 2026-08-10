@@ -9,7 +9,7 @@ import {
 import { nl } from 'date-fns/locale';
 import { SUBPROJECT_COLOR_MAP, STATUS_DOT_COLORS } from '../utils';
 import type { Task, Subproject } from '../types';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
 // ── Constants ──────────────────────────────────────────────
 const ROW_HEIGHT = 40;
@@ -222,6 +222,27 @@ export function GanttView() {
   const darkMode = isDarkMode;
   const today = new Date();
 
+  if (allTasks.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center dark:bg-slate-950">
+        <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4 shadow-sm">
+          <Plus className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Nog geen taken in de planning</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
+          Maak je eerste taak aan om de interactieve tijdlijn en Gantt weergave te activeren.
+        </p>
+        <button
+          onClick={() => openTaskModal()}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Eerste Taak Aanmaken
+        </button>
+      </div>
+    );
+  }
+
   // ── Synchronized scroll refs ───────────────────────────
   const labelPanelRef = useRef<HTMLDivElement>(null);
   const svgPanelRef = useRef<HTMLDivElement>(null);
@@ -328,15 +349,40 @@ export function GanttView() {
 
   // ── Build row structure ────────────────────────────────
   const rows: Row[] = [];
+  const renderedTaskIds = new Set<string>();
+
   subprojects.sort((a, b) => a.order - b.order).forEach((sp) => {
     rows.push({ type: 'subproject', subproject: sp, height: SUBPROJECT_ROW_HEIGHT });
     if (!sp.isCollapsed) {
       const spTasks = allTasks.filter((t) => t.subprojectId === sp.id).sort((a, b) => a.order - b.order);
       spTasks.forEach((task) => {
         rows.push({ type: 'task', task, subproject: sp, height: ROW_HEIGHT });
+        renderedTaskIds.add(task.id);
       });
+    } else {
+      allTasks.filter((t) => t.subprojectId === sp.id).forEach((t) => renderedTaskIds.add(t.id));
     }
   });
+
+  const orphanedTasks = allTasks.filter((t) => !renderedTaskIds.has(t.id));
+  if (orphanedTasks.length > 0) {
+    const fallbackSub: Subproject = {
+      id: 'sub-fallback-general',
+      name: 'Algemene Taken',
+      description: 'Algemene taken',
+      color: 'blue',
+      startDate: rangeStart.toISOString().split('T')[0],
+      endDate: rangeEnd.toISOString().split('T')[0],
+      isCollapsed: false,
+      order: 999,
+      createdAt: '',
+      updatedAt: '',
+    };
+    rows.push({ type: 'subproject', subproject: fallbackSub, height: SUBPROJECT_ROW_HEIGHT });
+    orphanedTasks.forEach((task) => {
+      rows.push({ type: 'task', task, subproject: fallbackSub, height: ROW_HEIGHT });
+    });
+  }
 
   // Compute cumulative Y offsets for SVG
   const rowYOffsets: number[] = [];

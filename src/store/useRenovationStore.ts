@@ -511,21 +511,50 @@ export const useRenovationStore = create<RenovationStore>()(
         })),
 
       // ── Task Actions ──────────────────────────────────────
-      addTask: (task) =>
-        set((s) => ({
-          tasks: [
-            ...s.tasks,
-            {
-              ...task,
-              id: generateId('task'),
-              materialIds: [],
-              commentIds: [],
-              progress: 0,
+      addTask: (task) => {
+        let subprojectId = task.subprojectId;
+        const currentSubprojects = get().subprojects;
+        let newSubprojects = [...currentSubprojects];
+
+        if (!subprojectId || !currentSubprojects.some((sp) => sp.id === subprojectId)) {
+          if (currentSubprojects.length === 0) {
+            const autoSub: Subproject = {
+              id: generateId('sub'),
+              name: 'Fase 1: Algemeen',
+              description: 'Hoofdfase van het project',
+              color: 'blue',
+              startDate: task.startDate || format(new Date(), 'yyyy-MM-dd'),
+              endDate: task.endDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+              isCollapsed: false,
+              order: 0,
               createdAt: now(),
               updatedAt: now(),
-            },
-          ],
-        })),
+            };
+            newSubprojects = [autoSub];
+            subprojectId = autoSub.id;
+          } else {
+            subprojectId = currentSubprojects[0].id;
+          }
+        }
+
+        const newTask: Task = {
+          ...task,
+          subprojectId: subprojectId!,
+          id: generateId('task'),
+          materialIds: [],
+          commentIds: [],
+          progress: 0,
+          createdAt: now(),
+          updatedAt: now(),
+        };
+
+        set((s) => ({
+          subprojects: newSubprojects,
+          tasks: [...s.tasks, newTask],
+        }));
+
+        return newTask;
+      },
 
       updateTask: (id, updates) =>
         set((s) => ({
