@@ -27,7 +27,7 @@ import type {
 import { seedData } from '../data/seed';
 import { generateId, formatISODate } from '../utils';
 import { hashPassword, verifyPassword, generateInviteToken } from '../utils/crypto';
-import { pushStateToServer } from '../hooks/useSocket';
+import { pushStateToServer, emitExpenseCreated, emitExpenseUpdated, emitExpenseDeleted } from '../hooks/useSocket';
 import { addDays, format } from 'date-fns';
 
 let isApplyingRemoteState = false;
@@ -227,47 +227,104 @@ export const useRenovationStore = create<RenovationStore>()(
           expenses: [newExpense, ...s.expenses],
         }));
 
+        emitExpenseCreated(newExpense);
+
         return newExpense;
       },
 
-      updateExpense: (id, updates) =>
+      updateExpense: (id, updates) => {
         set((s) => ({
           expenses: s.expenses.map((e) =>
             e.id === id ? { ...e, ...updates, updatedAt: now() } : e
           ),
-        })),
+        }));
+        emitExpenseUpdated(id, updates);
+      },
 
-      deleteExpense: (id) =>
+      deleteExpense: (id) => {
         set((s) => ({
           expenses: s.expenses.filter((e) => e.id !== id),
-        })),
+        }));
+        emitExpenseDeleted(id);
+      },
 
       getSettlementSummary: () => {
-        const { expenses, users } = get();
-        const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+        const { expenses, users, persons } = get();
+        const totalSpent = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-        const relevantUsers = users.length > 0
-          ? users
-          : [{ id: 'user-1', name: 'Ik', email: '', role: 'owner' as const, avatarColor: '#0ea5e9', avatarInitials: 'IK', createdAt: now() }];
+        // Collect all known user/participant IDs
+        const participantMap = new Map<string, { name: string; color: string; initials: string }>();
+
+        // 1. From users
+        users.forEach((u) => {
+          participantMap.set(u.id, {
+            name: u.name,
+            color: u.avatarColor || '#0ea5e9',
+            initials: u.avatarInitials || (u.name ? u.name.slice(0, 2).toUpperCase() : '??'),
+          });
+        });
+
+        // 2. From persons
+        persons.forEach((p) => {
+          const key = p.userId || p.id;
+          if (!participantMap.has(key)) {
+            participantMap.set(key, {
+              name: p.name,
+              color: p.color || '#0ea5e9',
+              initials: p.avatarInitials || (p.name ? p.name.slice(0, 2).toUpperCase() : '??'),
+            });
+          }
+        });
+
+        // 3. From expenses (ensure payer and split members are known)
+        expenses.forEach((e) => {
+          if (e.paidByUserId && !participantMap.has(e.paidByUserId)) {
+            participantMap.set(e.paidByUserId, {
+              name: e.paidByUserName || 'Collega',
+              color: '#10b981',
+              initials: e.paidByUserName ? e.paidByUserName.slice(0, 2).toUpperCase() : 'CO',
+            });
+          }
+          if (Array.isArray(e.splitAmongUserIds)) {
+            e.splitAmongUserIds.forEach((uid) => {
+              if (uid && !participantMap.has(uid)) {
+                participantMap.set(uid, {
+                  name: 'Teamlid',
+                  color: '#6366f1',
+                  initials: 'TL',
+                });
+              }
+            });
+          }
+        });
+
+        // Fallback default if empty
+        if (participantMap.size === 0) {
+          participantMap.set('user-1', { name: 'Ik', color: '#0ea5e9', initials: 'IK' });
+        }
 
         const userMap: Record<string, { totalPaid: number; fairShare: number }> = {};
-        relevantUsers.forEach((u) => {
-          userMap[u.id] = { totalPaid: 0, fairShare: 0 };
+        Array.from(participantMap.keys()).forEach((uid) => {
+          userMap[uid] = { totalPaid: 0, fairShare: 0 };
         });
 
         expenses.forEach((exp) => {
+          const amt = Number(exp.amount) || 0;
+          if (amt <= 0) return;
+
           // Paid by
-          if (!userMap[exp.paidByUserId]) {
-            userMap[exp.paidByUserId] = { totalPaid: 0, fairShare: 0 };
+          const payerId = exp.paidByUserId || Array.from(participantMap.keys())[0];
+          if (!userMap[payerId]) {
+            userMap[payerId] = { totalPaid: 0, fairShare: 0 };
           }
-          userMap[exp.paidByUserId].totalPaid += exp.amount;
+          userMap[payerId].totalPaid += amt;
 
           // Split among
-          const splitUsers = exp.splitAmongUserIds && exp.splitAmongUserIds.length > 0
+          const splitUsers = Array.isArray(exp.splitAmongUserIds) && exp.splitAmongUserIds.length > 0
             ? exp.splitAmongUserIds
-            : relevantUsers.map((u) => u.id);
+            : Array.from(participantMap.keys());
 
-          const sharePerPerson = exp.amount / splitUsers.length;
+          const sharePerPerson = amt / (splitUsers.length || 1);
           splitUsers.forEach((uid) => {
             if (!userMap[uid]) {
               userMap[uid] = { totalPaid: 0, fairShare: 0 };
@@ -277,15 +334,15 @@ export const useRenovationStore = create<RenovationStore>()(
         });
 
         const userSettlements: UserSettlement[] = Object.keys(userMap).map((uid) => {
-          const userObj = users.find((u) => u.id === uid);
+          const meta = participantMap.get(uid);
           const data = userMap[uid];
           const netBalance = Math.round((data.totalPaid - data.fairShare) * 100) / 100;
 
           return {
             userId: uid,
-            userName: userObj?.name || 'Onbekend',
-            avatarColor: userObj?.avatarColor || '#0ea5e9',
-            avatarInitials: userObj?.avatarInitials || '?',
+            userName: meta?.name || 'Teamlid',
+            avatarColor: meta?.color || '#0ea5e9',
+            avatarInitials: meta?.initials || 'TL',
             totalPaid: Math.round(data.totalPaid * 100) / 100,
             fairShare: Math.round(data.fairShare * 100) / 100,
             netBalance,
@@ -522,20 +579,32 @@ export const useRenovationStore = create<RenovationStore>()(
           if (remote.project && remote.project.name) {
             updates.project = remote.project;
           }
-          if (Array.isArray(remote.subprojects) && remote.subprojects.length > 0) {
-            updates.subprojects = remote.subprojects;
+          if (Array.isArray(remote.subprojects)) {
+            const subMap = new Map(s.subprojects.map((sp) => [sp.id, sp]));
+            remote.subprojects.forEach((sp: Subproject) => {
+              if (sp && sp.id) subMap.set(sp.id, { ...subMap.get(sp.id), ...sp });
+            });
+            updates.subprojects = Array.from(subMap.values());
           }
           if (Array.isArray(remote.tasks)) {
-            updates.tasks = remote.tasks;
+            const taskMap = new Map(s.tasks.map((t) => [t.id, t]));
+            remote.tasks.forEach((t: Task) => {
+              if (t && t.id) taskMap.set(t.id, { ...taskMap.get(t.id), ...t });
+            });
+            updates.tasks = Array.from(taskMap.values());
           }
           if (Array.isArray(remote.persons)) {
             const personMap = new Map(s.persons.map((p) => [p.id, p]));
-            remote.persons.forEach((p: Person) => personMap.set(p.id, { ...personMap.get(p.id), ...p }));
+            remote.persons.forEach((p: Person) => {
+              if (p && p.id) personMap.set(p.id, { ...personMap.get(p.id), ...p });
+            });
             updates.persons = Array.from(personMap.values());
           }
           if (Array.isArray(remote.users)) {
             const userMap = new Map(s.users.map((u) => [u.id, u]));
-            remote.users.forEach((u: User) => userMap.set(u.id, { ...userMap.get(u.id), ...u }));
+            remote.users.forEach((u: User) => {
+              if (u && u.id) userMap.set(u.id, { ...userMap.get(u.id), ...u });
+            });
             updates.users = Array.from(userMap.values());
             // If current user is in users list, sync properties
             if (s.currentUser) {
@@ -546,16 +615,58 @@ export const useRenovationStore = create<RenovationStore>()(
             }
           }
           if (Array.isArray(remote.expenses)) {
-            updates.expenses = remote.expenses;
+            const expMap = new Map(s.expenses.map((e) => [e.id, e]));
+            remote.expenses.forEach((e: PaymentExpense) => {
+              if (!e || !e.id) return;
+              const existing = expMap.get(e.id);
+              if (!existing) {
+                expMap.set(e.id, e);
+              } else {
+                const curTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+                const remTime = e.updatedAt ? new Date(e.updatedAt).getTime() : 0;
+                if (remTime >= curTime) {
+                  expMap.set(e.id, { ...existing, ...e });
+                }
+              }
+            });
+            updates.expenses = Array.from(expMap.values()).sort(
+              (a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime()
+            );
           }
           if (Array.isArray(remote.materials)) {
-            updates.materials = remote.materials;
+            const matMap = new Map(s.materials.map((m) => [m.id, m]));
+            remote.materials.forEach((m: Material) => {
+              if (m && m.id) matMap.set(m.id, { ...matMap.get(m.id), ...m });
+            });
+            updates.materials = Array.from(matMap.values());
           }
           if (Array.isArray(remote.comments)) {
-            updates.comments = remote.comments;
+            const comMap = new Map(s.comments.map((c) => [c.id, c]));
+            remote.comments.forEach((c: Comment) => {
+              if (c && c.id) comMap.set(c.id, { ...comMap.get(c.id), ...c });
+            });
+            updates.comments = Array.from(comMap.values());
           }
           if (Array.isArray(remote.budgetLines)) {
-            updates.budgetLines = remote.budgetLines;
+            const bMap = new Map(s.budgetLines.map((b) => [b.id, b]));
+            remote.budgetLines.forEach((b: BudgetLine) => {
+              if (b && b.id) bMap.set(b.id, { ...bMap.get(b.id), ...b });
+            });
+            updates.budgetLines = Array.from(bMap.values());
+          }
+          if (Array.isArray(remote.availableUpgrades)) {
+            const upgMap = new Map(s.availableUpgrades.map((u) => [u.id, u]));
+            remote.availableUpgrades.forEach((u: UpgradeOption) => {
+              if (u && u.id) upgMap.set(u.id, { ...upgMap.get(u.id), ...u });
+            });
+            updates.availableUpgrades = Array.from(upgMap.values());
+          }
+          if (Array.isArray(remote.projectUpgrades)) {
+            const projUpgMap = new Map(s.projectUpgrades.map((u) => [u.id, u]));
+            remote.projectUpgrades.forEach((u: ProjectUpgrade) => {
+              if (u && u.id) projUpgMap.set(u.id, { ...projUpgMap.get(u.id), ...u });
+            });
+            updates.projectUpgrades = Array.from(projUpgMap.values());
           }
           return updates;
         });

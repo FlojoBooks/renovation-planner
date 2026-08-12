@@ -37,6 +37,7 @@ export function ExpenseModal() {
     editingExpenseId,
     expenses,
     users,
+    persons,
     currentUser,
     subprojects,
     addExpense,
@@ -45,11 +46,38 @@ export function ExpenseModal() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Combine users and persons into unique available members
+  const availableMembers = React.useMemo(() => {
+    const map = new Map<string, { id: string; name: string; avatarColor: string; avatarInitials: string; roleTitle?: string }>();
+    users.forEach((u) => {
+      map.set(u.id, {
+        id: u.id,
+        name: u.name,
+        avatarColor: u.avatarColor || '#0ea5e9',
+        avatarInitials: u.avatarInitials || (u.name ? u.name.slice(0, 2).toUpperCase() : '??'),
+        roleTitle: u.roleTitle || u.role,
+      });
+    });
+    persons.forEach((p) => {
+      const id = p.userId || p.id;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          name: p.name,
+          avatarColor: p.color || '#0ea5e9',
+          avatarInitials: p.avatarInitials || (p.name ? p.name.slice(0, 2).toUpperCase() : '??'),
+          roleTitle: p.role || p.label,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [users, persons]);
+
   // Form states
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [paidByUserId, setPaidByUserId] = useState(() => currentUser?.id || users[0]?.id || 'user-1');
+  const [paidByUserId, setPaidByUserId] = useState(() => currentUser?.id || users[0]?.id || availableMembers[0]?.id || 'user-1');
   const [category, setCategory] = useState<PaymentCategory>('materials');
   const [subprojectId, setSubprojectId] = useState<string>('');
   const [splitAmongUserIds, setSplitAmongUserIds] = useState<string[]>([]);
@@ -90,21 +118,19 @@ export function ExpenseModal() {
     setTitle('');
     setAmount('');
     setDate(new Date().toISOString().split('T')[0]);
-    setPaidByUserId(currentUser?.id || users[0]?.id || 'user-1');
+    setPaidByUserId(currentUser?.id || users[0]?.id || availableMembers[0]?.id || 'user-1');
     setCategory('materials');
     setSubprojectId('');
-    // Default split among all owner/partner users
-    const defaultSplit = users
-      .filter((u) => u.role === 'owner' || u.role === 'partner')
-      .map((u) => u.id);
-    setSplitAmongUserIds(defaultSplit.length > 0 ? defaultSplit : users.map((u) => u.id));
+    // Default split among all members
+    const defaultSplit = availableMembers.map((u) => u.id);
+    setSplitAmongUserIds(defaultSplit.length > 0 ? defaultSplit : [currentUser?.id || 'user-1']);
     setNotes('');
     setReceiptImage(undefined);
     setReceiptThumbnail(undefined);
     setReceiptFileName(undefined);
     setCompressionMetrics(null);
     setErrorMsg(null);
-  }, [isExpenseModalOpen, editingExpenseId, expenses, users, currentUser]);
+  }, [isExpenseModalOpen, editingExpenseId, expenses, users, persons, currentUser, availableMembers]);
 
   if (!isExpenseModalOpen) return null;
 
@@ -164,12 +190,12 @@ export function ExpenseModal() {
       return;
     }
 
-    const payer = users.find((u) => u.id === paidByUserId);
-    const paidByUserName = payer ? payer.name : 'Onbekend';
+    const payer = availableMembers.find((u) => u.id === paidByUserId) || users.find((u) => u.id === paidByUserId);
+    const paidByUserName = payer ? payer.name : (currentUser?.name || 'Onbekend');
 
     const cleanSplit = splitAmongUserIds.length > 0
       ? splitAmongUserIds
-      : users.map((u) => u.id);
+      : availableMembers.map((u) => u.id);
 
     const expensePayload = {
       title: title.trim(),
@@ -278,9 +304,9 @@ export function ExpenseModal() {
                 onChange={(e) => setPaidByUserId(e.target.value)}
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                {users.map((u) => (
+                {availableMembers.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name} ({u.roleTitle || u.role})
+                    {u.name} {u.roleTitle ? `(${u.roleTitle})` : ''}
                   </option>
                 ))}
               </select>
@@ -352,7 +378,7 @@ export function ExpenseModal() {
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">
-              {users.map((u) => {
+              {availableMembers.map((u) => {
                 const isChecked = splitAmongUserIds.includes(u.id);
                 return (
                   <button

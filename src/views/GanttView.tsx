@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { useRenovationStore } from '../store/useRenovationStore';
 import {
   parseISO, differenceInDays, addDays, format,
@@ -9,13 +9,13 @@ import {
 import { nl } from 'date-fns/locale';
 import { SUBPROJECT_COLOR_MAP, STATUS_DOT_COLORS } from '../utils';
 import type { Task, Subproject } from '../types';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, GripVertical, FolderInput, ArrowRightLeft } from 'lucide-react';
 
 // ── Constants ──────────────────────────────────────────────
 const ROW_HEIGHT = 40;
-const SUBPROJECT_ROW_HEIGHT = 36;
+const SUBPROJECT_ROW_HEIGHT = 38;
 const HEADER_HEIGHT = 60;
-const LABEL_WIDTH = 260;
+const LABEL_WIDTH = 270;
 const DAY_WIDTH = { Day: 40, Week: 140, Month: 40 } as const;
 type ViewMode = 'Day' | 'Week' | 'Month';
 
@@ -211,9 +211,13 @@ export function GanttView() {
     openTaskModal,
     updateTaskDates,
     updateTask,
+    moveTask,
     toggleSubprojectCollapsed,
     isDarkMode,
   } = useRenovationStore();
+
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragOverSubprojectId, setDragOverSubprojectId] = useState<string | null>(null);
 
   const allTasks = getFilteredTasks();
   const mode = ganttViewMode as ViewMode;
@@ -222,7 +226,7 @@ export function GanttView() {
   const darkMode = isDarkMode;
   const today = new Date();
 
-  // ── Synchronized scroll refs & callbacks (Called unconditional at top) ───
+  // ── Synchronized scroll refs & callbacks ───
   const labelPanelRef = useRef<HTMLDivElement>(null);
   const svgPanelRef = useRef<HTMLDivElement>(null);
   const syncingLabel = useRef(false);
@@ -246,22 +250,51 @@ export function GanttView() {
     syncingSvg.current = false;
   }, []);
 
+  // ── Drag & Drop Handlers to Move Tasks Between Phases ───
+  const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData('taskId', taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    requestAnimationFrame(() => setDraggingTaskId(taskId));
+  };
+
+  const handleTaskDragEnd = () => {
+    setDraggingTaskId(null);
+    setDragOverSubprojectId(null);
+  };
+
+  const handleSubprojectDragOver = (e: React.DragEvent, subprojectId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSubprojectId !== subprojectId) {
+      setDragOverSubprojectId(subprojectId);
+    }
+  };
+
+  const handleSubprojectDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverSubprojectId(null);
+    }
+  };
+
+  const handleSubprojectDrop = (e: React.DragEvent, targetSubprojectId: string) => {
+    e.preventDefault();
+    setDragOverSubprojectId(null);
+    setDraggingTaskId(null);
+    const taskId = e.dataTransfer.getData('taskId') || draggingTaskId;
+    if (taskId) {
+      moveTask(taskId, targetSubprojectId);
+    }
+  };
+
   // ── SVG click: open new task modal ────────────────────
   const handleSvgClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       const tag = (e.target as SVGElement).tagName;
       if (tag === 'svg' || tag === 'rect' || tag === 'line') {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left + (svgPanelRef.current?.scrollLeft ?? 0);
-        const dayOffset = Math.floor(x / cellWidth);
-        const clickedDate = addDays(rangeStart, dayOffset);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _dateStr = format(clickedDate, 'yyyy-MM-dd');
-        // Open modal — datum integratie is toekomstig
         openTaskModal();
       }
     },
-    [cellWidth, rangeStart, openTaskModal]
+    [openTaskModal]
   );
 
   if (allTasks.length === 0) {
@@ -286,7 +319,6 @@ export function GanttView() {
   }
 
   // ── Two-layer column headers ───────────────────────────
-  // Bottom row: individual columns
   let columns: { label: string; date: Date; span: number; isWeekend?: boolean; isSun?: boolean; isToday?: boolean }[] = [];
 
   if (mode === 'Day') {
@@ -326,7 +358,6 @@ export function GanttView() {
       };
     });
   } else {
-    // Month mode: group by year
     const years = [
       ...new Set(
         eachMonthOfInterval({ start: rangeStart, end: rangeEnd }).map((d) => d.getFullYear())
@@ -417,9 +448,19 @@ export function GanttView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-1 overflow-hidden">
+      {/* Subtle Drag Hint Banner when dragging */}
+      {draggingTaskId && (
+        <div className="bg-emerald-600 text-white px-4 py-1.5 text-xs font-semibold flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4" />
+            <span>Sleep de taak naar een andere fase in de lijst om hem te verplaatsen</span>
+          </div>
+          <span className="text-[11px] opacity-80">Laat los op een fase</span>
+        </div>
+      )}
 
-        {/* ── Left label panel ─────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Left label panel (with Drag & Drop Phase Moving) ── */}
         <div
           ref={labelPanelRef}
           onScroll={onLabelScroll}
@@ -428,56 +469,114 @@ export function GanttView() {
         >
           {/* Header spacer */}
           <div
-            className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 flex items-center shrink-0"
+            className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 flex items-center justify-between shrink-0"
             style={{ height: HEADER_HEIGHT }}
           >
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Taak</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Fases & Taken
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">Sleep om te wisselen</span>
           </div>
 
           {/* Rows */}
-          {rows.map((row, i) => {
+          {rows.map((row) => {
             if (row.type === 'subproject') {
-              const colorCfg = SUBPROJECT_COLOR_MAP[row.subproject.color];
-              const taskCount = allTasks.filter((t) => t.subprojectId === row.subproject.id).length;
-              const doneCount = allTasks.filter((t) => t.subprojectId === row.subproject.id && t.isCompleted).length;
+              const sp = row.subproject;
+              const colorCfg = SUBPROJECT_COLOR_MAP[sp.color];
+              const taskCount = allTasks.filter((t) => t.subprojectId === sp.id).length;
+              const doneCount = allTasks.filter((t) => t.subprojectId === sp.id && t.isCompleted).length;
+              const isDragOver = dragOverSubprojectId === sp.id;
+
               return (
-                <button
-                  key={`sp-${row.subproject.id}`}
-                  onClick={() => toggleSubprojectCollapsed(row.subproject.id)}
-                  className="w-full flex items-center gap-2 px-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700
-                    hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0"
+                <div
+                  key={`sp-${sp.id}`}
+                  onDragOver={(e) => handleSubprojectDragOver(e, sp.id)}
+                  onDragLeave={handleSubprojectDragLeave}
+                  onDrop={(e) => handleSubprojectDrop(e, sp.id)}
+                  className={`w-full flex items-center gap-2 px-3 border-b transition-all shrink-0 cursor-pointer select-none
+                    ${isDragOver
+                      ? 'bg-emerald-100 dark:bg-emerald-950/80 border-emerald-500 ring-2 ring-emerald-500 ring-inset'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
+                    }`}
                   style={{ height: SUBPROJECT_ROW_HEIGHT }}
+                  onClick={() => toggleSubprojectCollapsed(sp.id)}
                 >
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: colorCfg.gantt }} />
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1 text-left">{row.subproject.name}</span>
-                  <span className="text-xs text-slate-400 shrink-0">{doneCount}/{taskCount}</span>
-                  {row.subproject.isCollapsed
-                    ? <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
-                    : <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />}
-                </button>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                    style={{ backgroundColor: colorCfg.gantt }}
+                  />
+                  <div className="min-w-0 flex-1 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                      {sp.name}
+                    </span>
+                    {isDragOver ? (
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 animate-pulse bg-emerald-200/80 dark:bg-emerald-900 px-1.5 py-0.5 rounded">
+                        + Hier plaatsen
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 shrink-0 ml-1">
+                        {doneCount}/{taskCount}
+                      </span>
+                    )}
+                  </div>
+                  {sp.isCollapsed ? (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  )}
+                </div>
               );
             } else {
+              const task = row.task;
+              const sp = row.subproject;
+              const isCurrentDragging = draggingTaskId === task.id;
+              const isDragOver = dragOverSubprojectId === sp.id;
+
               return (
-                <button
-                  key={`task-${row.task.id}`}
-                  onClick={() => openTaskModal(row.task.id)}
-                  className="w-full flex items-center gap-2 px-4 border-b border-slate-50 dark:border-slate-800
-                    hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left shrink-0"
+                <div
+                  key={`task-${task.id}`}
+                  draggable
+                  onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                  onDragEnd={handleTaskDragEnd}
+                  onDragOver={(e) => handleSubprojectDragOver(e, sp.id)}
+                  onDragLeave={handleSubprojectDragLeave}
+                  onDrop={(e) => handleSubprojectDrop(e, sp.id)}
+                  onClick={() => openTaskModal(task.id)}
+                  className={`w-full group flex items-center gap-2 px-3 border-b transition-all text-left shrink-0 select-none cursor-grab active:cursor-grabbing
+                    ${isCurrentDragging
+                      ? 'opacity-40 bg-blue-50 dark:bg-blue-950/40 border-blue-400 scale-[0.98]'
+                      : isDragOver
+                      ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900'
+                      : 'border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
                   style={{ height: ROW_HEIGHT }}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT_COLORS[row.task.status]}`} />
-                  <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{row.task.title}</span>
-                  {row.task.isCompleted && (
-                    <span className="ml-auto text-[10px] text-green-600 shrink-0">✓</span>
+                  <span
+                    className="shrink-0 text-slate-300 dark:text-slate-600 opacity-40 group-hover:opacity-100 transition-opacity"
+                    title="Sleep naar een andere fase"
+                  >
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </span>
+
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT_COLORS[task.status]}`} />
+                  <span
+                    className={`text-xs text-slate-700 dark:text-slate-300 truncate flex-1 ${
+                      task.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                    }`}
+                  >
+                    {task.title}
+                  </span>
+
+                  {task.isCompleted && (
+                    <span className="ml-auto text-[10px] text-green-600 font-bold shrink-0">✓</span>
                   )}
-                </button>
+                </div>
               );
             }
           })}
         </div>
 
-        {/* ── Gantt SVG panel ──────────────────────────── */}
+        {/* ── Gantt SVG panel (Supports Drops on Phase Lanes) ── */}
         <div
           ref={svgPanelRef}
           onScroll={onSvgScroll}
@@ -503,24 +602,20 @@ export function GanttView() {
             {/* ── Top-layer header: month/year groups ── */}
             {topGroups.map((grp, i) => (
               <g key={`tg-${i}`}>
-                {/* Group background */}
                 <rect x={grp.x} y={0} width={grp.width} height={28}
                   fill={i % 2 === 0
                     ? (darkMode ? '#0f172a' : '#f1f5f9')
                     : (darkMode ? '#1e293b' : '#e2e8f0')}
                 />
-                {/* Group label */}
                 <text x={grp.x + 8} y={20} fontSize={11} fill={darkMode ? '#cbd5e1' : '#475569'}
                   fontWeight="600" style={{ pointerEvents: 'none', userSelect: 'none' }}>
                   {grp.label}
                 </text>
-                {/* Left border of group */}
                 <line x1={grp.x} y1={0} x2={grp.x} y2={28}
                   stroke={headerLineFill} strokeWidth={1} />
               </g>
             ))}
 
-            {/* Separator between top and bottom header rows */}
             <line x1={0} y1={28} x2={totalWidth + 40} y2={28} stroke={headerLineFill} strokeWidth={1} />
 
             {/* ── Bottom-layer header: columns ── */}
@@ -533,7 +628,6 @@ export function GanttView() {
                   : headerTextFill;
               return (
                 <g key={`col-${i}`}>
-                  {/* Weekend column tint spanning full chart */}
                   {mode === 'Day' && col.isWeekend && (
                     <rect
                       x={x}
@@ -544,14 +638,12 @@ export function GanttView() {
                       style={{ pointerEvents: 'none' }}
                     />
                   )}
-                  {/* Today highlight in bottom header */}
                   {col.isToday && (
                     <rect x={x} y={28} width={cellWidth} height={HEADER_HEIGHT - 28}
                       fill={darkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)'}
                       style={{ pointerEvents: 'none' }}
                     />
                   )}
-                  {/* Bottom column label */}
                   <text
                     x={x + (mode === 'Day' ? cellWidth / 2 : 8)}
                     y={48}
@@ -563,29 +655,44 @@ export function GanttView() {
                   >
                     {col.label}
                   </text>
-                  {/* Vertical column separator */}
                   <line x1={x} y1={28} x2={x} y2={svgHeight}
                     stroke={headerLineFill} strokeWidth={1} />
                 </g>
               );
             })}
 
-            {/* Bottom header border */}
             <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth + 40} y2={HEADER_HEIGHT}
               stroke={headerLineFill} strokeWidth={1} />
 
-            {/* ── Row background stripes ── */}
-            {rows.map((row, i) => (
-              <rect
-                key={`bg-${i}`}
-                x={0}
-                y={HEADER_HEIGHT + rowYOffsets[i]}
-                width={totalWidth + 40}
-                height={row.height}
-                fill={rowFill(row, i)}
-                style={{ pointerEvents: 'none' }}
-              />
-            ))}
+            {/* ── Row background stripes & drop highlights ── */}
+            {rows.map((row, i) => {
+              const spId = row.type === 'subproject' ? row.subproject.id : row.subproject.id;
+              const isDragOverThisPhase = dragOverSubprojectId === spId;
+
+              return (
+                <g key={`bg-${i}`}>
+                  <rect
+                    x={0}
+                    y={HEADER_HEIGHT + rowYOffsets[i]}
+                    width={totalWidth + 40}
+                    height={row.height}
+                    fill={isDragOverThisPhase
+                      ? (darkMode ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.12)')
+                      : rowFill(row, i)}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  {/* Subtle row bottom line */}
+                  <line
+                    x1={0}
+                    y1={HEADER_HEIGHT + rowYOffsets[i] + row.height}
+                    x2={totalWidth + 40}
+                    y2={HEADER_HEIGHT + rowYOffsets[i] + row.height}
+                    stroke={darkMode ? '#1e293b' : '#f1f5f9'}
+                    strokeWidth={1}
+                  />
+                </g>
+              );
+            })}
 
             {/* ── Today line ── */}
             {todayX >= 0 && (

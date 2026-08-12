@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRenovationStore } from '../store/useRenovationStore';
+import { fetchServerState } from '../hooks/useSocket';
 import type { PaymentCategory, PaymentExpense } from '../types';
 import {
   Receipt,
@@ -22,6 +23,7 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownLeft,
+  RefreshCw,
 } from 'lucide-react';
 import { formatCurrency, formatShortDate } from '../utils';
 
@@ -40,6 +42,7 @@ export function ExpensesView() {
   const {
     expenses,
     users,
+    persons,
     currentUser,
     openExpenseModal,
     openInviteModal,
@@ -48,12 +51,66 @@ export function ExpensesView() {
     selectedReceiptImage,
     openReceiptLightbox,
     closeReceiptLightbox,
+    applyRemoteState,
   } = useRenovationStore();
 
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [payerFilter, setPayerFilter] = useState<string>('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Zojuist');
 
   const settlement = getSettlementSummary();
+
+  // Combine users and persons into unique available members for filter and display
+  const availableMembers = React.useMemo(() => {
+    const map = new Map<string, { id: string; name: string; avatarColor: string; avatarInitials: string }>();
+    users.forEach((u) => {
+      map.set(u.id, {
+        id: u.id,
+        name: u.name,
+        avatarColor: u.avatarColor || '#0ea5e9',
+        avatarInitials: u.avatarInitials || (u.name ? u.name.slice(0, 2).toUpperCase() : '??'),
+      });
+    });
+    persons.forEach((p) => {
+      const id = p.userId || p.id;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          name: p.name,
+          avatarColor: p.color || '#0ea5e9',
+          avatarInitials: p.avatarInitials || (p.name ? p.name.slice(0, 2).toUpperCase() : '??'),
+        });
+      }
+    });
+    // Also add payers from expenses if not found
+    expenses.forEach((e) => {
+      if (e.paidByUserId && !map.has(e.paidByUserId)) {
+        map.set(e.paidByUserId, {
+          id: e.paidByUserId,
+          name: e.paidByUserName || 'Collega',
+          avatarColor: '#10b981',
+          avatarInitials: e.paidByUserName ? e.paidByUserName.slice(0, 2).toUpperCase() : 'CO',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [users, persons, expenses]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const serverData = await fetchServerState();
+      if (serverData) {
+        applyRemoteState(serverData);
+        setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (e) {
+      console.warn('Manual sync failed:', e);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 400);
+    }
+  };
 
   const filteredExpenses = expenses.filter((e) => {
     if (categoryFilter !== 'all' && e.category !== categoryFilter) return false;
@@ -74,30 +131,43 @@ export function ExpensesView() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide">
               <Receipt className="w-3.5 h-3.5 text-emerald-200" />
               Uitgaven & Wie Betaalt Wat
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse ml-1" />
+              <span className="text-[10px] text-emerald-100 font-normal">Real-time gedeeld</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
               Betalingen & Kostenverdeling
             </h1>
             <p className="text-sm md:text-base text-emerald-100/90 leading-relaxed">
-              Upload foto's van kassabonnen en facturen (automatisch gecomprimeerd). Het systeem berekent direct de onderlinge verrekening zodat iedereen eerlijk zijn deel betaalt.
+              Upload foto's van kassabonnen en facturen. Alle uitgaven en de automatische kostenverrekening worden live gedeeld tussen alle projectleden.
             </p>
           </div>
 
           <div className="flex flex-wrap md:flex-col gap-3 shrink-0">
             <button
               onClick={() => openExpenseModal()}
-              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-emerald-800 font-bold text-sm shadow-lg hover:bg-emerald-50 transition-all active:scale-95"
+              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-emerald-800 font-bold text-sm shadow-lg hover:bg-emerald-50 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-emerald-700" />
               Nieuwe Betaling / Bon
             </button>
-            <button
-              onClick={openInviteModal}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-black/20 backdrop-blur-sm border border-white/20 text-white font-semibold text-xs hover:bg-black/30 transition-all"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              Private Invite Link
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-black/20 backdrop-blur-sm border border-white/20 text-white font-semibold text-xs hover:bg-black/30 transition-all cursor-pointer"
+                title="Synchroniseer live met de server"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>{isRefreshing ? 'Laden...' : 'Vernieuwen'}</span>
+              </button>
+              <button
+                onClick={openInviteModal}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-black/20 backdrop-blur-sm border border-white/20 text-white font-semibold text-xs hover:bg-black/30 transition-all cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Invite Link
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -110,7 +180,7 @@ export function ExpensesView() {
             <Wallet className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Totaal Uitgegeven</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Totaal Uitgegeven (Team)</p>
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">
               {formatCurrency(settlement.totalSpent)}
             </h3>
@@ -176,7 +246,7 @@ export function ExpensesView() {
               Kostenverdeling & Onderlinge Verrekening
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Automatische berekening van de inleg en wie aan wie moet betalen
+              Automatische berekening van de inleg en wie aan wie moet betalen over alle geregistreerde teamleden
             </p>
           </div>
         </div>
@@ -200,7 +270,7 @@ export function ExpensesView() {
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                       {item.userName}
                     </h4>
-                    <span className="text-[11px] text-slate-400">Teamlid</span>
+                    <span className="text-[11px] text-slate-400">Projectlid</span>
                   </div>
                 </div>
 
@@ -302,7 +372,7 @@ export function ExpensesView() {
               className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
             >
               <option value="all">Alle Betalers</option>
-              {users.map((u) => (
+              {availableMembers.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>
@@ -325,7 +395,7 @@ export function ExpensesView() {
             </p>
             <button
               onClick={() => openExpenseModal()}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20"
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer"
             >
               + Eerste Betaling Toevoegen
             </button>
@@ -333,7 +403,8 @@ export function ExpensesView() {
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {filteredExpenses.map((expense) => {
-              const payer = users.find((u) => u.id === expense.paidByUserId);
+              const payer = availableMembers.find((u) => u.id === expense.paidByUserId) || users.find((u) => u.id === expense.paidByUserId);
+              const splitCount = expense.splitAmongUserIds?.length || availableMembers.length;
 
               return (
                 <div
@@ -372,6 +443,11 @@ export function ExpensesView() {
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
                           {CATEGORY_NAMES[expense.category] || expense.category}
                         </span>
+                        {expense.receiptImage && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 shrink-0">
+                            📷 Bon bijgevoegd
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
@@ -382,16 +458,16 @@ export function ExpensesView() {
 
                         <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
                           <span
-                            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold"
+                            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold shrink-0"
                             style={{ backgroundColor: payer?.avatarColor || '#0ea5e9' }}
                           >
-                            {payer?.avatarInitials || 'GB'}
+                            {payer?.avatarInitials || (expense.paidByUserName ? expense.paidByUserName.slice(0, 2).toUpperCase() : 'CO')}
                           </span>
-                          Betaald door {expense.paidByUserName}
+                          Betaald door {expense.paidByUserName || payer?.name || 'Collega'}
                         </span>
 
                         <span className="text-[11px] text-slate-400">
-                          (Verdeeld over {expense.splitAmongUserIds?.length || users.length} pers.)
+                          (Verdeeld over {splitCount} pers.)
                         </span>
                       </div>
                     </div>
@@ -403,9 +479,9 @@ export function ExpensesView() {
                       <span className="text-base font-extrabold text-slate-900 dark:text-white">
                         {formatCurrency(expense.amount)}
                       </span>
-                      {expense.splitAmongUserIds?.length > 1 && (
+                      {splitCount > 1 && (
                         <span className="block text-[10px] text-slate-400 font-medium">
-                          {formatCurrency(expense.amount / expense.splitAmongUserIds.length)} p.p.
+                          {formatCurrency(expense.amount / splitCount)} p.p.
                         </span>
                       )}
                     </div>
@@ -413,14 +489,14 @@ export function ExpensesView() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openExpenseModal(expense.id)}
-                        className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         title="Bewerken"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteExpense(expense.id)}
-                        className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
                         title="Verwijderen"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -454,14 +530,14 @@ export function ExpensesView() {
                 <a
                   href={selectedReceiptImage}
                   download="betaalbewijs.jpg"
-                  className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                   title="Download foto"
                 >
                   <Download className="w-4 h-4" />
                 </a>
                 <button
                   onClick={closeReceiptLightbox}
-                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
