@@ -82,16 +82,98 @@ try {
   console.warn('[Sync] Failed to load shared-state.json:', e);
 }
 
+const MOCK_NAMES = ['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker', 'Verbouwing Thuis 2025'];
+const MOCK_ID_PREFIXES = ['person-alice', 'person-bob', 'person-carol', 'person-david', 'sub-badkamer', 'sub-isolatie', 'sub-elektra', 'sub-keuken', 'task-sloop', 'task-tegels', 'task-sanitair', 'task-vloer', 'task-spouw', 'task-meterkast', 'task-groepen', 'task-keuken', 'project-verbouwing-2025'];
+
+// Purge any old mock/seed data from PostgreSQL and in-memory state
+async function purgeLegacyMockData() {
+  try {
+    await prisma.comment.deleteMany({
+      where: {
+        OR: [
+          { authorName: { in: MOCK_NAMES } },
+          { authorId: { in: ['person-alice', 'person-bob', 'person-carol', 'person-david'] } },
+        ],
+      },
+    });
+    await prisma.taskAssignee.deleteMany({
+      where: {
+        OR: [
+          { personId: { in: ['person-alice', 'person-bob', 'person-carol', 'person-david'] } },
+        ],
+      },
+    });
+    await prisma.task.deleteMany({
+      where: {
+        OR: [
+          { title: { contains: 'sloop', mode: 'insensitive' } },
+          { title: { contains: 'badkamer', mode: 'insensitive' } },
+          { title: { contains: 'isolatie', mode: 'insensitive' } },
+          { title: { contains: 'meterkast', mode: 'insensitive' } },
+          { title: { contains: 'groepen', mode: 'insensitive' } },
+          { id: { in: ['task-sloop-badkamer', 'task-tegels-badkamer', 'task-sanitair', 'task-afwerking-badkamer', 'task-vloerisolatie', 'task-spouwmuur', 'task-meterkast', 'task-groepen', 'task-keuken-sloop', 'task-keuken-plaatsen', 'task-keuken-tegels'] } },
+        ],
+      },
+    });
+    await prisma.subproject.deleteMany({
+      where: {
+        OR: [
+          { id: { in: ['sub-badkamer', 'sub-isolatie', 'sub-elektra', 'sub-keuken'] } },
+          { name: { in: ['Badkamer', 'Begane grond isolatie', 'Elektra', 'Keuken'] } },
+          { projectId: 'project-verbouwing-2025' },
+        ],
+      },
+    });
+    await prisma.budgetLine.deleteMany({
+      where: {
+        OR: [
+          { projectId: 'project-verbouwing-2025' },
+          { id: { in: ['budget-badkamer-materiaal', 'budget-badkamer-sanitair', 'budget-badkamer-arbeid', 'budget-isolatie-materiaal', 'budget-elektra-meterkast', 'budget-keuken-totaal'] } },
+        ],
+      },
+    });
+    await prisma.paymentExpense.deleteMany({
+      where: {
+        OR: [
+          { paidByUserName: { in: MOCK_NAMES } },
+          { paidByUserId: { in: ['person-alice', 'person-bob', 'person-carol', 'person-david'] } },
+        ],
+      },
+    });
+    await prisma.person.deleteMany({
+      where: {
+        OR: [
+          { name: { in: MOCK_NAMES } },
+          { id: { in: ['person-alice', 'person-bob', 'person-carol', 'person-david'] } },
+        ],
+      },
+    });
+    await prisma.project.deleteMany({
+      where: {
+        OR: [
+          { id: 'project-verbouwing-2025' },
+          { name: { contains: 'Verbouwing Thuis', mode: 'insensitive' } },
+        ],
+      },
+    });
+    console.log('[Sync] Successfully cleaned legacy mock rows from database');
+  } catch (err) {
+    // Silently continue if tables not yet populated
+  }
+}
+
 // Attempt to load from PostgreSQL Prisma DB if connected
 async function tryLoadFromPrisma() {
   try {
+    await purgeLegacyMockData();
+
     const project = await prisma.project.findFirst({
       include: {
         subprojects: { orderBy: { order: 'asc' } },
       },
     });
 
-    if (project) {
+    if (project && project.id !== 'project-verbouwing-2025') {
       const tasks = await prisma.task.findMany({
         include: {
           assignees: { include: { person: true } },
@@ -110,28 +192,24 @@ async function tryLoadFromPrisma() {
       });
 
       sharedState.project = project;
-      if (project.subprojects && project.subprojects.length > 0) {
-        sharedState.subprojects = project.subprojects;
-      }
-      if (tasks && tasks.length > 0) {
-        sharedState.tasks = tasks.map((t) => ({
-          ...t,
-          assigneeIds: t.assignees.map((a) => a.personId),
-          dependencies: t.dependsOn.map((d) => d.prerequisiteTaskId),
-        }));
-      }
-      if (persons && persons.length > 0) sharedState.persons = persons;
-      if (users && users.length > 0) sharedState.users = users;
-      if (materials && materials.length > 0) sharedState.materials = materials;
-      if (comments && comments.length > 0) sharedState.comments = comments;
-      if (budgetLines && budgetLines.length > 0) sharedState.budgetLines = budgetLines;
-      if (expenses && expenses.length > 0) sharedState.expenses = expenses;
+      sharedState.subprojects = project.subprojects || [];
+      sharedState.tasks = (tasks || []).map((t) => ({
+        ...t,
+        assigneeIds: t.assignees.map((a) => a.personId),
+        dependencies: t.dependsOn.map((d) => d.prerequisiteTaskId),
+      }));
+      sharedState.persons = persons || [];
+      sharedState.users = users || [];
+      sharedState.materials = materials || [];
+      sharedState.comments = comments || [];
+      sharedState.budgetLines = budgetLines || [];
+      sharedState.expenses = expenses || [];
 
-      console.log(`[Sync] Synced with Prisma PostgreSQL (${sharedState.tasks.length} tasks, ${sharedState.subprojects.length} subprojects)`);
+      console.log(`[Sync] Loaded clean state from PostgreSQL (${sharedState.tasks.length} tasks, ${sharedState.subprojects.length} subprojects)`);
       persistSharedStateToDisk();
     }
   } catch (err) {
-    // Database not running locally or table empty, proceed with in-memory/disk store
+    // Database not running locally or table empty, proceed with clean in-memory/disk store
   }
 }
 tryLoadFromPrisma();
