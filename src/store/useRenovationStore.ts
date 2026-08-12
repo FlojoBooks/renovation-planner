@@ -669,20 +669,6 @@ export const useRenovationStore = create<RenovationStore>()(
             updates.projectUpgrades = Array.from(projUpgMap.values());
           }
 
-          // Safety: If state ends up completely empty, fallback to seedData
-          const finalSubprojects = updates.subprojects ?? s.subprojects;
-          const finalTasks = updates.tasks ?? s.tasks;
-          if (finalSubprojects.length === 0 && finalTasks.length === 0) {
-            updates.project = seedData.project;
-            updates.subprojects = seedData.subprojects;
-            updates.tasks = seedData.tasks;
-            updates.persons = seedData.persons;
-            updates.materials = seedData.materials;
-            updates.comments = seedData.comments;
-            updates.budgetLines = seedData.budgetLines;
-            updates.users = seedData.users;
-          }
-
           return updates;
         });
         setTimeout(() => {
@@ -1103,11 +1089,6 @@ export const useRenovationStore = create<RenovationStore>()(
         ganttViewMode: state.ganttViewMode,
         isDarkMode: state.isDarkMode,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state && (!state.tasks || state.tasks.length === 0) && (!state.subprojects || state.subprojects.length === 0)) {
-          state.restoreSeedData();
-        }
-      },
     }
   )
 );

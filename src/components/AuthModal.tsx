@@ -302,20 +302,6 @@ export function AuthModal() {
                   Invite Link Genereren
                 </button>
               </div>
-
-              <div className="pt-1 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  onClick={() => {
-                    restoreSeedData();
-                    closeAuthModal();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer"
-                  title="Herstel alle database/seed fasen, taken, materialen en budgetten"
-                >
-                  <Building2 className="w-3.5 h-3.5" />
-                  Standaard Database Projectdata Herstellen
-                </button>
-              </div>
             </div>
           )}
 
