@@ -690,6 +690,37 @@ export const useRenovationStore = create<RenovationStore>()(
         });
       },
 
+      clearAllProjectData: async () => {
+        const cleanProj: Project = {
+          id: generateId('proj'),
+          name: 'Mijn Project',
+          description: '',
+          address: '',
+          startDate: format(new Date(), 'yyyy-MM-dd'),
+          endDate: format(addDays(new Date(), 60), 'yyyy-MM-dd'),
+          totalBudget: 0,
+          currency: 'EUR',
+          createdAt: now(),
+          updatedAt: now(),
+        };
+
+        set({
+          project: cleanProj,
+          subprojects: [],
+          tasks: [],
+          materials: [],
+          comments: [],
+          budgetLines: [],
+          expenses: [],
+          availableUpgrades: [],
+          projectUpgrades: [],
+        });
+
+        try {
+          await fetch('/api/sync/clear', { method: 'POST' });
+        } catch (e) {}
+      },
+
       // ── Task Actions ──────────────────────────────────────
       addTask: (task) => {
         let subprojectId = task.subprojectId;

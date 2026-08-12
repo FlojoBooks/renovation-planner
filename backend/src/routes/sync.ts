@@ -406,6 +406,58 @@ syncRouter.get('/', async (_req: Request, res: Response) => {
   });
 });
 
+// ─── POST /api/sync/clear ─────────────────────────────────────────────────────
+syncRouter.post('/clear', async (_req: Request, res: Response) => {
+  try {
+    sharedState = {
+      project: defaultProject,
+      subprojects: [],
+      tasks: [],
+      persons: [],
+      materials: [],
+      comments: [],
+      budgetLines: [],
+      users: [],
+      expenses: [],
+      availableUpgrades: [],
+      projectUpgrades: [],
+      lastUpdated: new Date().toISOString(),
+    };
+    persistSharedStateToDisk();
+
+    try {
+      await prisma.comment.deleteMany();
+      await prisma.material.deleteMany();
+      await prisma.taskDependency.deleteMany();
+      await prisma.taskAssignee.deleteMany();
+      await prisma.task.deleteMany();
+      await prisma.budgetLine.deleteMany();
+      await prisma.subproject.deleteMany();
+      await prisma.paymentExpense.deleteMany();
+      await prisma.projectUpgrade.deleteMany();
+      await prisma.person.deleteMany();
+      await prisma.project.deleteMany();
+    } catch (dbErr) {
+      console.warn('Database clear warning:', dbErr);
+    }
+
+    try {
+      if (io) {
+        io.emit('state:synced', sharedState);
+      }
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      data: sharedState,
+      message: 'Alle projectdata succesvol gewist',
+    });
+  } catch (err) {
+    console.error('Error in /api/sync/clear:', err);
+    res.status(500).json({ error: 'Failed to clear state' });
+  }
+});
+
 // ─── POST /api/sync ───────────────────────────────────────────────────────────
 syncRouter.post('/', (req: Request, res: Response) => {
   try {

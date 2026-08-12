@@ -17,6 +17,7 @@ import {
   HeartHandshake,
   Wrench,
   Compass,
+  Trash2,
 } from 'lucide-react';
 
 const AVATAR_COLORS = [
@@ -73,7 +74,7 @@ export function AuthModal() {
     registerUserAsync,
     logoutUser,
     openInviteModal,
-    restoreSeedData,
+    clearAllProjectData,
   } = useRenovationStore();
 
   const [activeTab, setActiveTab] = useState<'switch' | 'register'>('switch');
@@ -300,6 +301,21 @@ export function AuthModal() {
                 >
                   <Sparkles className="w-4 h-4" />
                   Invite Link Genereren
+                </button>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  onClick={async () => {
+                    if (window.confirm('Weet je zeker dat je alle projectdata en taken wilt wissen om met een schone lei te beginnen?')) {
+                      await clearAllProjectData();
+                      closeAuthModal();
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Project Volledig Schoonmaken (Schone Lei)
                 </button>
               </div>
             </div>

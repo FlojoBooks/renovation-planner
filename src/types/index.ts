@@ -474,6 +474,9 @@ export interface RenovationStore {
   updateBudgetLine: (id: string, updates: Partial<BudgetLine>) => void;
   deleteBudgetLine: (id: string) => void;
 
+  // ── Project Reset ─────────────────────────────────────────
+  clearAllProjectData: () => Promise<void>;
+
   // ── UI Actions ────────────────────────────────────────────
   setActiveView: (view: ActiveView) => void;
   setActiveSubproject: (id: string | null) => void;
