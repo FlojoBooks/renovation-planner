@@ -213,6 +213,7 @@ export function GanttView() {
     updateTask,
     moveTask,
     toggleSubprojectCollapsed,
+    restoreSeedData,
     isDarkMode,
   } = useRenovationStore();
 
@@ -305,15 +306,24 @@ export function GanttView() {
         </div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Nog geen taken in de planning</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-          Maak je eerste taak aan om de interactieve tijdlijn en Gantt weergave te activeren.
+          Maak je eerste taak aan of herstel de standaard database projectdata om de interactieve tijdlijn te activeren.
         </p>
-        <button
-          onClick={() => openTaskModal()}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Eerste Taak Aanmaken
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => openTaskModal()}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Nieuwe Taak Aanmaken
+          </button>
+          <button
+            onClick={() => restoreSeedData()}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 font-bold text-sm hover:bg-emerald-100 transition-all cursor-pointer"
+          >
+            <FolderInput className="w-4 h-4" />
+            Database Data Herstellen
+          </button>
+        </div>
       </div>
     );
   }

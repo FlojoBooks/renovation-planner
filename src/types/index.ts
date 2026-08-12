@@ -441,6 +441,7 @@ export interface RenovationStore {
 
   // ── Sync Actions ──────────────────────────────────────────
   applyRemoteState: (remote: any) => void;
+  restoreSeedData: () => void;
 
   // ── Task Actions ──────────────────────────────────────────
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'materialIds' | 'commentIds' | 'progress'>) => void;

@@ -657,22 +657,47 @@ export const useRenovationStore = create<RenovationStore>()(
           if (Array.isArray(remote.availableUpgrades)) {
             const upgMap = new Map(s.availableUpgrades.map((u) => [u.id, u]));
             remote.availableUpgrades.forEach((u: UpgradeOption) => {
-              if (u && u.id) upgMap.set(u.id, { ...upgMap.get(u.id), ...u });
-            });
-            updates.availableUpgrades = Array.from(upgMap.values());
-          }
-          if (Array.isArray(remote.projectUpgrades)) {
+          if (Array.isArray(remote.projectUpgrades) && remote.projectUpgrades.length > 0) {
             const projUpgMap = new Map(s.projectUpgrades.map((u) => [u.id, u]));
             remote.projectUpgrades.forEach((u: ProjectUpgrade) => {
               if (u && u.id) projUpgMap.set(u.id, { ...projUpgMap.get(u.id), ...u });
             });
             updates.projectUpgrades = Array.from(projUpgMap.values());
           }
+
+          // Safety: If state ends up completely empty, fallback to seedData
+          const finalSubprojects = updates.subprojects ?? s.subprojects;
+          const finalTasks = updates.tasks ?? s.tasks;
+          if (finalSubprojects.length === 0 && finalTasks.length === 0) {
+            updates.project = seedData.project;
+            updates.subprojects = seedData.subprojects;
+            updates.tasks = seedData.tasks;
+            updates.persons = seedData.persons;
+            updates.materials = seedData.materials;
+            updates.comments = seedData.comments;
+            updates.budgetLines = seedData.budgetLines;
+            updates.users = seedData.users;
+          }
+
           return updates;
         });
         setTimeout(() => {
           isApplyingRemoteState = false;
         }, 100);
+      },
+
+      restoreSeedData: () => {
+        set({
+          project: seedData.project,
+          subprojects: seedData.subprojects,
+          tasks: seedData.tasks,
+          persons: seedData.persons,
+          materials: seedData.materials,
+          comments: seedData.comments,
+          budgetLines: seedData.budgetLines,
+          users: seedData.users,
+          currentUser: seedData.currentUser,
+        });
       },
 
       // ── Task Actions ──────────────────────────────────────
@@ -1074,6 +1099,11 @@ export const useRenovationStore = create<RenovationStore>()(
         ganttViewMode: state.ganttViewMode,
         isDarkMode: state.isDarkMode,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state && (!state.tasks || state.tasks.length === 0) && (!state.subprojects || state.subprojects.length === 0)) {
+          state.restoreSeedData();
+        }
+      },
     }
   )
 );
