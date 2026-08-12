@@ -319,95 +319,114 @@ export function updateSharedState(updates: Partial<typeof sharedState>) {
 
 async function syncToPrismaDb(updates: Partial<typeof sharedState>) {
   try {
-    if (updates.project && updates.project.id) {
-      await prisma.project.upsert({
-        where: { id: updates.project.id },
-        update: {
-          name: updates.project.name || 'Mijn Project',
-          description: updates.project.description || '',
-          address: updates.project.address || '',
-          startDate: updates.project.startDate || new Date().toISOString().split('T')[0],
-          endDate: updates.project.endDate || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          totalBudget: updates.project.totalBudget || 0,
-          currency: updates.project.currency || 'EUR',
-        },
-        create: {
-          id: updates.project.id,
-          name: updates.project.name || 'Mijn Project',
-          description: updates.project.description || '',
-          address: updates.project.address || '',
-          startDate: updates.project.startDate || new Date().toISOString().split('T')[0],
-          endDate: updates.project.endDate || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          totalBudget: updates.project.totalBudget || 0,
-          currency: updates.project.currency || 'EUR',
-        },
-      });
-    }
+    const projectId = updates.project?.id || sharedState.project?.id || 'proj-001';
+    const projectName = updates.project?.name || sharedState.project?.name || 'Mijn Project';
 
+    // 1. Ensure project exists in PostgreSQL
+    await prisma.project.upsert({
+      where: { id: projectId },
+      update: {
+        name: projectName,
+        description: updates.project?.description ?? sharedState.project?.description ?? '',
+        address: updates.project?.address ?? sharedState.project?.address ?? '',
+        startDate: updates.project?.startDate ?? sharedState.project?.startDate ?? new Date().toISOString().split('T')[0],
+        endDate: updates.project?.endDate ?? sharedState.project?.endDate ?? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        totalBudget: Number(updates.project?.totalBudget ?? sharedState.project?.totalBudget ?? 0),
+        currency: updates.project?.currency ?? 'EUR',
+      },
+      create: {
+        id: projectId,
+        name: projectName,
+        description: updates.project?.description ?? '',
+        address: updates.project?.address ?? '',
+        startDate: updates.project?.startDate ?? new Date().toISOString().split('T')[0],
+        endDate: updates.project?.endDate ?? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        totalBudget: Number(updates.project?.totalBudget ?? 0),
+        currency: updates.project?.currency ?? 'EUR',
+      },
+    });
+
+    // 2. Ensure all subprojects exist in PostgreSQL
     if (Array.isArray(updates.subprojects)) {
-      const projId = updates.project?.id || sharedState.project?.id || 'proj-001';
       for (const sp of updates.subprojects) {
         if (!sp || !sp.id) continue;
         await prisma.subproject.upsert({
           where: { id: sp.id },
           update: {
-            name: sp.name,
+            name: sp.name || 'Fase',
             description: sp.description || '',
             color: sp.color || 'blue',
             startDate: sp.startDate || new Date().toISOString().split('T')[0],
             endDate: sp.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            isCollapsed: sp.isCollapsed ?? false,
-            order: sp.order ?? 0,
+            isCollapsed: Boolean(sp.isCollapsed),
+            order: Number(sp.order ?? 0),
           },
           create: {
             id: sp.id,
-            projectId: projId,
-            name: sp.name,
+            projectId: projectId,
+            name: sp.name || 'Fase',
             description: sp.description || '',
             color: sp.color || 'blue',
             startDate: sp.startDate || new Date().toISOString().split('T')[0],
             endDate: sp.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            isCollapsed: sp.isCollapsed ?? false,
-            order: sp.order ?? 0,
+            isCollapsed: Boolean(sp.isCollapsed),
+            order: Number(sp.order ?? 0),
           },
         });
       }
     }
 
+    // 3. Ensure all tasks exist in PostgreSQL
     if (Array.isArray(updates.tasks)) {
       for (const t of updates.tasks) {
-        if (!t || !t.id || !t.subprojectId) continue;
+        if (!t || !t.id) continue;
+        const subId = t.subprojectId || (updates.subprojects && updates.subprojects[0]?.id) || (sharedState.subprojects[0]?.id) || 'sub-default';
+
+        // Guarantee parent subproject exists before saving task
+        await prisma.subproject.upsert({
+          where: { id: subId },
+          update: {},
+          create: {
+            id: subId,
+            projectId: projectId,
+            name: 'Algemeen',
+            color: 'blue',
+            startDate: t.startDate || new Date().toISOString().split('T')[0],
+            endDate: t.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          },
+        });
+
         await prisma.task.upsert({
           where: { id: t.id },
           update: {
-            title: t.title,
+            title: t.title || 'Nieuwe taak',
             description: t.description || '',
             status: t.status || 'todo',
             priority: t.priority || 'medium',
             startDate: t.startDate || new Date().toISOString().split('T')[0],
             endDate: t.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: t.progress ?? 0,
-            isCompleted: t.isCompleted ?? false,
-            estimatedHours: t.estimatedHours,
-            actualHours: t.actualHours,
-            order: t.order ?? 0,
-            tags: t.tags ?? [],
+            progress: Number(t.progress ?? 0),
+            isCompleted: Boolean(t.isCompleted),
+            estimatedHours: t.estimatedHours ? Number(t.estimatedHours) : null,
+            actualHours: t.actualHours ? Number(t.actualHours) : null,
+            order: Number(t.order ?? 0),
+            tags: Array.isArray(t.tags) ? t.tags : [],
           },
           create: {
             id: t.id,
-            subprojectId: t.subprojectId,
-            title: t.title,
+            subprojectId: subId,
+            title: t.title || 'Nieuwe taak',
             description: t.description || '',
             status: t.status || 'todo',
             priority: t.priority || 'medium',
             startDate: t.startDate || new Date().toISOString().split('T')[0],
             endDate: t.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: t.progress ?? 0,
-            isCompleted: t.isCompleted ?? false,
-            estimatedHours: t.estimatedHours,
-            actualHours: t.actualHours,
-            order: t.order ?? 0,
-            tags: t.tags ?? [],
+            progress: Number(t.progress ?? 0),
+            isCompleted: Boolean(t.isCompleted),
+            estimatedHours: t.estimatedHours ? Number(t.estimatedHours) : null,
+            actualHours: t.actualHours ? Number(t.actualHours) : null,
+            order: Number(t.order ?? 0),
+            tags: Array.isArray(t.tags) ? t.tags : [],
           },
         });
       }
@@ -419,12 +438,12 @@ async function syncToPrismaDb(updates: Partial<typeof sharedState>) {
         await prisma.paymentExpense.upsert({
           where: { id: e.id },
           update: {
-            title: e.title,
-            amount: e.amount || 0,
+            title: e.title || 'Uitgave',
+            amount: Number(e.amount || 0),
             category: e.category || 'materials',
             paidByUserId: e.paidByUserId || '',
             paidByUserName: e.paidByUserName || '',
-            splitAmongUserIds: e.splitAmongUserIds || [],
+            splitAmongUserIds: Array.isArray(e.splitAmongUserIds) ? e.splitAmongUserIds : [],
             subprojectId: e.subprojectId || null,
             taskId: e.taskId || null,
             date: e.date || new Date().toISOString().split('T')[0],
@@ -434,12 +453,12 @@ async function syncToPrismaDb(updates: Partial<typeof sharedState>) {
           },
           create: {
             id: e.id,
-            title: e.title,
-            amount: e.amount || 0,
+            title: e.title || 'Uitgave',
+            amount: Number(e.amount || 0),
             category: e.category || 'materials',
             paidByUserId: e.paidByUserId || '',
             paidByUserName: e.paidByUserName || '',
-            splitAmongUserIds: e.splitAmongUserIds || [],
+            splitAmongUserIds: Array.isArray(e.splitAmongUserIds) ? e.splitAmongUserIds : [],
             subprojectId: e.subprojectId || null,
             taskId: e.taskId || null,
             date: e.date || new Date().toISOString().split('T')[0],
@@ -451,7 +470,7 @@ async function syncToPrismaDb(updates: Partial<typeof sharedState>) {
       }
     }
   } catch (err) {
-    // Silently ignore if Railway DB is momentarily unreachable
+    console.error('[Sync] Prisma sync error:', err);
   }
 }
 

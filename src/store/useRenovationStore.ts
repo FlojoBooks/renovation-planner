@@ -580,34 +580,38 @@ export const useRenovationStore = create<RenovationStore>()(
             updates.project = remote.project;
           }
           if (Array.isArray(remote.subprojects)) {
-            const cleanSubs = remote.subprojects.filter((sp: Subproject) => sp && !['sub-badkamer', 'sub-isolatie', 'sub-elektra', 'sub-keuken'].includes(sp.id));
-            const subMap = new Map(s.subprojects.filter((sp) => !['sub-badkamer', 'sub-isolatie', 'sub-elektra', 'sub-keuken'].includes(sp.id)).map((sp) => [sp.id, sp]));
-            cleanSubs.forEach((sp: Subproject) => {
-              if (sp && sp.id) subMap.set(sp.id, { ...subMap.get(sp.id), ...sp });
+            const subMap = new Map(s.subprojects.map((sp) => [sp.id, sp]));
+            remote.subprojects.forEach((sp: Subproject) => {
+              if (sp && sp.id && !['sub-badkamer', 'sub-isolatie', 'sub-elektra', 'sub-keuken'].includes(sp.id)) {
+                subMap.set(sp.id, { ...subMap.get(sp.id), ...sp });
+              }
             });
             updates.subprojects = Array.from(subMap.values());
           }
           if (Array.isArray(remote.tasks)) {
-            const cleanTasks = remote.tasks.filter((t: Task) => t && !t.id.startsWith('task-') && !t.title.toLowerCase().includes('sloopwerk badkamer'));
-            const taskMap = new Map(s.tasks.filter((t) => !t.id.startsWith('task-') && !t.title.toLowerCase().includes('sloopwerk badkamer')).map((t) => [t.id, t]));
-            cleanTasks.forEach((t: Task) => {
-              if (t && t.id) taskMap.set(t.id, { ...taskMap.get(t.id), ...t });
+            const taskMap = new Map(s.tasks.map((t) => [t.id, t]));
+            remote.tasks.forEach((t: Task) => {
+              if (t && t.id && !['task-sloop-badkamer', 'task-tegels-badkamer', 'task-sanitair', 'task-afwerking-badkamer', 'task-vloerisolatie', 'task-spouwmuur', 'task-meterkast', 'task-groepen', 'task-keuken-sloop', 'task-keuken-plaatsen', 'task-keuken-tegels'].includes(t.id)) {
+                taskMap.set(t.id, { ...taskMap.get(t.id), ...t });
+              }
             });
             updates.tasks = Array.from(taskMap.values());
           }
           if (Array.isArray(remote.persons)) {
-            const cleanPersons = remote.persons.filter((p: Person) => p && !['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker'].includes(p.name));
-            const personMap = new Map(s.persons.filter((p) => !['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker'].includes(p.name)).map((p) => [p.id, p]));
-            cleanPersons.forEach((p: Person) => {
-              if (p && p.id) personMap.set(p.id, { ...personMap.get(p.id), ...p });
+            const personMap = new Map(s.persons.map((p) => [p.id, p]));
+            remote.persons.forEach((p: Person) => {
+              if (p && p.id && !['person-alice', 'person-bob', 'person-carol', 'person-david'].includes(p.id)) {
+                personMap.set(p.id, { ...personMap.get(p.id), ...p });
+              }
             });
             updates.persons = Array.from(personMap.values());
           }
           if (Array.isArray(remote.users)) {
-            const cleanUsers = remote.users.filter((u: User) => u && !['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker'].includes(u.name));
-            const userMap = new Map(s.users.filter((u) => !['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker'].includes(u.name)).map((u) => [u.id, u]));
-            cleanUsers.forEach((u: User) => {
-              if (u && u.id) userMap.set(u.id, { ...userMap.get(u.id), ...u });
+            const userMap = new Map(s.users.map((u) => [u.id, u]));
+            remote.users.forEach((u: User) => {
+              if (u && u.id && !['person-alice', 'person-bob', 'person-carol', 'person-david'].includes(u.id)) {
+                userMap.set(u.id, { ...userMap.get(u.id), ...u });
+              }
             });
             updates.users = Array.from(userMap.values());
             // If current user is in users list, sync properties
@@ -619,18 +623,18 @@ export const useRenovationStore = create<RenovationStore>()(
             }
           }
           if (Array.isArray(remote.expenses)) {
-            const cleanExpenses = remote.expenses.filter((e: PaymentExpense) => e && !['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker'].includes(e.paidByUserName));
-            const expMap = new Map(s.expenses.filter((e) => !['Alice Jansen', 'Bob de Vries', 'Carol Smit', 'David Bakker'].includes(e.paidByUserName)).map((e) => [e.id, e]));
-            cleanExpenses.forEach((e: PaymentExpense) => {
-              if (!e || !e.id) return;
-              const existing = expMap.get(e.id);
-              if (!existing) {
-                expMap.set(e.id, e);
-              } else {
-                const curTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-                const remTime = e.updatedAt ? new Date(e.updatedAt).getTime() : 0;
-                if (remTime >= curTime) {
-                  expMap.set(e.id, { ...existing, ...e });
+            const expMap = new Map(s.expenses.map((e) => [e.id, e]));
+            remote.expenses.forEach((e: PaymentExpense) => {
+              if (e && e.id && !['person-alice', 'person-bob', 'person-carol', 'person-david'].includes(e.paidByUserId)) {
+                const existing = expMap.get(e.id);
+                if (!existing) {
+                  expMap.set(e.id, e);
+                } else {
+                  const curTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+                  const remTime = e.updatedAt ? new Date(e.updatedAt).getTime() : 0;
+                  if (remTime >= curTime) {
+                    expMap.set(e.id, { ...existing, ...e });
+                  }
                 }
               }
             });
@@ -648,14 +652,14 @@ export const useRenovationStore = create<RenovationStore>()(
           if (Array.isArray(remote.comments)) {
             const comMap = new Map(s.comments.map((c) => [c.id, c]));
             remote.comments.forEach((c: Comment) => {
-              if (c && c.id) comMap.set(c.id, { ...comMap.get(c.id), ...c });
+              if (c && c.id && !c.id.startsWith('comment-')) comMap.set(c.id, { ...comMap.get(c.id), ...c });
             });
             updates.comments = Array.from(comMap.values());
           }
           if (Array.isArray(remote.budgetLines)) {
             const bMap = new Map(s.budgetLines.map((b) => [b.id, b]));
             remote.budgetLines.forEach((b: BudgetLine) => {
-              if (b && b.id) bMap.set(b.id, { ...bMap.get(b.id), ...b });
+              if (b && b.id && !b.id.startsWith('budget-')) bMap.set(b.id, { ...bMap.get(b.id), ...b });
             });
             updates.budgetLines = Array.from(bMap.values());
           }
