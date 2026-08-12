@@ -657,6 +657,10 @@ export const useRenovationStore = create<RenovationStore>()(
           if (Array.isArray(remote.availableUpgrades)) {
             const upgMap = new Map(s.availableUpgrades.map((u) => [u.id, u]));
             remote.availableUpgrades.forEach((u: UpgradeOption) => {
+              if (u && u.id) upgMap.set(u.id, { ...upgMap.get(u.id), ...u });
+            });
+            updates.availableUpgrades = Array.from(upgMap.values());
+          }
           if (Array.isArray(remote.projectUpgrades) && remote.projectUpgrades.length > 0) {
             const projUpgMap = new Map(s.projectUpgrades.map((u) => [u.id, u]));
             remote.projectUpgrades.forEach((u: ProjectUpgrade) => {
